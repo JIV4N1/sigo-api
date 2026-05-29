@@ -6,24 +6,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        // Primero verifica si la columna ya existe
+        if (!Schema::hasColumn('proyectos', 'cliente_id')) {
+            Schema::table('proyectos', function (Blueprint $table) {
+                $table->unsignedBigInteger('cliente_id')->nullable();
+            });
+        }
+        
+        // Solo agrega la FK
         Schema::table('proyectos', function (Blueprint $table) {
-            $table->foreignId('cliente_id')->nullable()->constrained('clientes')->nullOnDelete();
+            $table->foreign('cliente_id')->references('id')->on('clientes')->onDelete('set null');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('proyectos', function (Blueprint $table) {
             $table->dropForeign(['cliente_id']);
-            $table->dropColumn('cliente_id');
         });
     }
 };
