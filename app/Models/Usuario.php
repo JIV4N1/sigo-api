@@ -30,6 +30,7 @@ class Usuario extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'empresa_id',
         'nombre',
         'email',
         'password',
@@ -115,6 +116,23 @@ class Usuario extends Authenticatable
     public function asistencias(): HasMany
     {
         return $this->hasMany(Asistencia::class, 'usuario_id');
+    }
+
+    /**
+     * Relación: la empresa principal o actual del usuario.
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_id');
+    }
+
+    /**
+     * Relación: todas las empresas a las que el usuario tiene acceso (útil para roles admin/multi-empresa).
+     */
+    public function empresas(): BelongsToMany
+    {
+        return $this->belongsToMany(Empresa::class, 'empresa_usuario', 'usuario_id', 'empresa_id')
+                    ->withPivot('rol_en_empresa', 'asignado_el');
     }
 }
 
