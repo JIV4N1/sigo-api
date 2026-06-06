@@ -60,7 +60,6 @@ class Usuario extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
             'activo'            => 'boolean',
             'ultimo_acceso'     => 'datetime',
         ];
