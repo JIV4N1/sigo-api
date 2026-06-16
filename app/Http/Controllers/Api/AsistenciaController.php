@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Asistencia\RegistrarEntradaRequest;
 use App\Models\Asistencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,26 +25,52 @@ class AsistenciaController extends Controller
         if ($asistencia) {
             if ($asistencia->salida) {
                 $estado = 'finalizada';
+                if ($asistencia->entrada && $asistencia->salida) {
+                    $minutos = $asistencia->entrada->diffInMinutes($asistencia->salida);
+                    if ($asistencia->comida_inicio && $asistencia->comida_fin) {
+                        $minutos_comida = $asistencia->comida_inicio->diffInMinutes($asistencia->comida_fin);
+                        $minutos -= $minutos_comida;
+                    }
+                    $asistencia->horas_trabajadas = round(max(0, $minutos) / 60, 2);
+                }
             } elseif ($asistencia->comida_inicio && !$asistencia->comida_fin) {
                 $estado = 'en_comida';
             } else {
                 $estado = 'en_jornada';
+                if ($asistencia->entrada) {
+                    $minutos = $asistencia->entrada->diffInMinutes(Carbon::now());
+                    if ($asistencia->comida_inicio && $asistencia->comida_fin) {
+                        $minutos_comida = $asistencia->comida_inicio->diffInMinutes($asistencia->comida_fin);
+                        $minutos -= $minutos_comida;
+                    } elseif ($asistencia->comida_inicio && !$asistencia->comida_fin) {
+                        $minutos_comida = $asistencia->comida_inicio->diffInMinutes(Carbon::now());
+                        $minutos -= $minutos_comida;
+                    }
+                    $asistencia->horas_trabajadas = round(max(0, $minutos) / 60, 2);
+                }
             }
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => $asistencia,
-            'estado' => $estado,
-            'message' => 'Asistencia de hoy obtenida correctamente.',
+            'data' => [
+                'registro' => $asistencia,
+                'estado' => $estado,
+            ]
         ]);
     }
 
     /**
      * Registrar entrada de jornada
      */
-    public function registrarEntrada(RegistrarEntradaRequest $request): JsonResponse
+    public function registrarEntrada(Request $request): JsonResponse
     {
+        $request->validate([
+            'latitud' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitud' => ['nullable', 'numeric', 'between:-180,180'],
+            'proyecto_id' => ['nullable', 'exists:proyectos,id'],
+        ]);
+
         $hoy = Carbon::today();
         $user = $request->user();
 
@@ -57,41 +82,32 @@ class AsistenciaController extends Controller
         if ($existe) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Ya existe un registro de asistencia para el día de hoy.',
+                'message' => 'Ya registró entrada hoy',
             ], 422);
         }
 
-        // Verificar si omitió salida ayer
-        $ayer = Carbon::yesterday();
-        $asistenciaAyer = Asistencia::where('usuario_id', $user->id)
-            ->whereDate('fecha', $ayer)
-            ->first();
-
-        $warning = null;
-        if ($asistenciaAyer && !$asistenciaAyer->salida) {
-            $warning = 'No registró salida el día anterior.';
+        $empresa_id = null;
+        if ($request->proyecto_id) {
+            $proyecto = \App\Models\Proyecto::find($request->proyecto_id);
+            if ($proyecto) {
+                $empresa_id = $proyecto->empresa_id;
+            }
         }
 
         $asistencia = Asistencia::create([
             'usuario_id' => $user->id,
             'proyecto_id' => $request->proyecto_id,
+            'empresa_id' => $empresa_id,
             'fecha' => $hoy,
             'entrada' => Carbon::now(),
             'latitud_entrada' => $request->latitud,
             'longitud_entrada' => $request->longitud,
         ]);
 
-        $response = [
+        return response()->json([
             'status' => 'success',
             'data' => $asistencia,
-            'message' => 'Entrada registrada correctamente.',
-        ];
-
-        if ($warning) {
-            $response['warning'] = $warning;
-        }
-
-        return response()->json($response, 201);
+        ], 201);
     }
 
     /**
@@ -107,14 +123,14 @@ class AsistenciaController extends Controller
         if (!$asistencia || !$asistencia->entrada) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Debe registrar su entrada primero.',
+                'message' => 'Debe registrar entrada primero',
             ], 422);
         }
 
         if ($asistencia->comida_inicio) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Ya inició su horario de comida.',
+                'message' => 'Ya registró inicio de comida',
             ], 422);
         }
 
@@ -125,7 +141,6 @@ class AsistenciaController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $asistencia,
-            'message' => 'Inicio de comida registrado.',
         ]);
     }
 
@@ -139,17 +154,24 @@ class AsistenciaController extends Controller
             ->whereDate('fecha', $hoy)
             ->first();
 
-        if (!$asistencia || !$asistencia->comida_inicio) {
+        if (!$asistencia || !$asistencia->entrada) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'No ha iniciado su horario de comida.',
+                'message' => 'Debe registrar entrada primero',
+            ], 422);
+        }
+
+        if (!$asistencia->comida_inicio) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Debe iniciar comida primero',
             ], 422);
         }
 
         if ($asistencia->comida_fin) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Ya finalizó su horario de comida.',
+                'message' => 'Ya registró fin de comida',
             ], 422);
         }
 
@@ -160,7 +182,6 @@ class AsistenciaController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $asistencia,
-            'message' => 'Fin de comida registrado.',
         ]);
     }
 
@@ -170,8 +191,8 @@ class AsistenciaController extends Controller
     public function registrarSalida(Request $request): JsonResponse
     {
         $request->validate([
-            'latitud' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitud' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitud' => ['nullable', 'numeric'],
+            'longitud' => ['nullable', 'numeric'],
         ]);
 
         $hoy = Carbon::today();
@@ -182,31 +203,25 @@ class AsistenciaController extends Controller
         if (!$asistencia || !$asistencia->entrada) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Debe registrar su entrada primero.',
+                'message' => 'Debe registrar entrada primero',
             ], 422);
         }
 
         if ($asistencia->salida) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Ya registró su salida el día de hoy.',
+                'message' => 'Ya registró salida hoy',
             ], 422);
         }
 
         if ($asistencia->comida_inicio && !$asistencia->comida_fin) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Debe finalizar horario de comida.',
+                'message' => 'Debe finalizar horario de comida antes de registrar salida',
             ], 422);
         }
 
         $now = Carbon::now();
-        if ($now->lessThanOrEqualTo($asistencia->entrada)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'La hora de salida no puede ser igual o anterior a la hora de entrada.',
-            ], 422);
-        }
 
         $asistencia->update([
             'salida' => $now,
@@ -217,7 +232,6 @@ class AsistenciaController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $asistencia,
-            'message' => 'Salida registrada correctamente.',
         ]);
     }
 
