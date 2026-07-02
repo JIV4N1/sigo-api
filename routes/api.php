@@ -32,9 +32,18 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // =========================================================================
     // MÓDULO 2: Proyectos
     // =========================================================================
-    Route::get('/proyectos', [ProyectoController::class, 'index'])->name('proyectos.index');
-    Route::get('/proyectos/{id}', [ProyectoController::class, 'show'])->name('proyectos.show');
-    Route::get('/proyectos/{id}/actividad', [ProyectoController::class, 'actividad'])->name('proyectos.actividad');
+    Route::prefix('proyectos')->name('proyectos.')->group(function () {
+        Route::get('/', [ProyectoController::class, 'index'])->name('index');
+        Route::post('/', [ProyectoController::class, 'store'])->name('store');
+        Route::get('/{id}', [ProyectoController::class, 'show'])->name('show');
+        Route::put('/{id}', [ProyectoController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ProyectoController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}/actividad', [ProyectoController::class, 'actividad'])->name('actividad');
+        Route::get('/{id}/kpis', [ProyectoController::class, 'kpis'])->name('kpis');
+        Route::get('/{id}/usuarios-disponibles', [ProyectoController::class, 'usuariosDisponibles'])->name('usuarios-disponibles');
+        Route::post('/{id}/usuarios', [ProyectoController::class, 'asignarUsuario'])->name('asignar-usuario');
+        Route::delete('/{id}/usuarios/{usuarioId}', [ProyectoController::class, 'removerUsuario'])->name('remover-usuario');
+    });
 
     // =========================================================================
     // MÓDULO 3: Reportes Diarios

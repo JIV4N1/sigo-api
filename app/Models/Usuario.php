@@ -79,10 +79,43 @@ class Usuario extends Authenticatable
 
     /**
      * Relación: un usuario pertenece a muchos proyectos (tabla pivote proyecto_usuario).
+     *
+     * Incluye los campos adicionales del pivote:
+     * - rol_en_proyecto: el rol que desempeña en el proyecto
+     * - asignado_el: fecha de asignación
+     * - activo: si la asignación está vigente
      */
     public function proyectos(): BelongsToMany
     {
-        return $this->belongsToMany(Proyecto::class, 'proyecto_usuario', 'usuario_id', 'proyecto_id');
+        return $this->belongsToMany(Proyecto::class, 'proyecto_usuario', 'usuario_id', 'proyecto_id')
+                    ->withPivot('rol_en_proyecto', 'asignado_el', 'activo');
+    }
+
+    /**
+     * Solo los proyectos con asignación activa (activo = true en el pivote).
+     */
+    public function proyectosActivos(): BelongsToMany
+    {
+        return $this->proyectos()->wherePivot('activo', true);
+    }
+
+    /**
+     * Verifica si el usuario tiene alguno de los roles especificados.
+     *
+     * Ejemplo: $user->tieneRol(['gerente', 'administrador'])
+     *
+     * @param  string|array  $roles
+     * @return bool
+     */
+    public function tieneRol(string|array $roles): bool
+    {
+        if (! $this->relationLoaded('rol')) {
+            $this->load('rol');
+        }
+
+        $nombreRol = $this->rol?->nombre;
+
+        return in_array($nombreRol, (array) $roles, true);
     }
 
     /**

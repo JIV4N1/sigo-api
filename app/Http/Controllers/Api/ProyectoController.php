@@ -6,67 +6,59 @@ use App\Http\Controllers\Controller;
 use App\Models\Incidencia;
 use App\Models\Proyecto;
 use App\Models\ReporteDiario;
+use App\Models\Usuario;
+use App\Http\Requests\ProyectoStoreRequest;
+use App\Http\Requests\ProyectoUpdateRequest;
+use App\Http\Requests\AsignacionRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Controlador de proyectos del sistema SIGO.
  *
- * Expone los endpoints para consultar proyectos asignados al usuario
- * autenticado, el detalle de cada proyecto con sus KPIs y la actividad
- * reciente combinando reportes e incidencias.
+ * Expone los endpoints para consultar, crear, actualizar y desactivar proyectos,
+ * así como la asignación de personal y la visualización de KPIs y actividad.
  */
 class ProyectoController extends Controller
 {
     // =========================================================================
-    // INDEX — Listado paginado de proyectos asignados
+    // INDEX — Listar proyectos con filtros
     // =========================================================================
-
-    /**
-     * Retorna los proyectos asignados al usuario autenticado.
-     *
-     * Soporta filtro opcional por estado (?estado=a_tiempo) y búsqueda
-     * por nombre o código (?busqueda=torre). Los resultados se ordenan
-     * por fecha_fin ascendente (los más próximos a vencer primero) y se
-     * paginan en grupos de 10.
-     *
-     * Para cada proyecto se incluyen KPIs rápidos calculados con conteos
-     * eficientes (withCount) y el último reporte de avance.
-     *
-     * @param  Request  $request  Petición autenticada con Sanctum.
-     * @return JsonResponse
-     */
     public function index(Request $request): JsonResponse
     {
         try {
-            // 1. Construir la consulta base sobre los proyectos del usuario autenticado.
-            //    Se usan withCount para evitar N+1 al calcular los totales.
-            $query = $request->user()
-                ->proyectos()
-                ->withCount([
-                    // Total de reportes diarios registrados en el proyecto
-                    'reportesDiarios as total_reportes',
-                    // Total de incidencias (abiertas y cerradas)
-                    'incidencias as total_incidencias',
-                    // Solo incidencias que no han sido cerradas aún
-                    'incidencias as incidencias_abiertas' => fn ($q) =>
-                        $q->where('estado', '!=', Incidencia::ESTADO_CERRADA),
-                ])
-                ->with([
-                    // El último reporte del proyecto (fecha y avance)
-                    'reportesDiarios' => fn ($q) =>
-                        $q->select('proyecto_id', 'fecha_reporte', 'avance')
-                          ->orderByDesc('fecha_reporte')
-                          ->limit(1),
-                ]);
+            $user = $request->user();
+            $empresaId = $user->empresa_id;
 
-            // 2. Filtro opcional por estado del proyecto
+            // Gerentes y administradores ven todos los proyectos de su empresa.
+            // Supervisores e ingenieros solo ven proyectos asignados activamente.
+            if ($user->tieneRol(['gerente', 'administrador'])) {
+                $query = Proyecto::where('empresa_id', $empresaId);
+            } else {
+                $query = $user->proyectosActivos();
+            }
+
+            // Eager load counts
+            $query->withCount([
+                'reportesDiarios as total_reportes',
+                'incidencias as total_incidencias',
+                'incidencias as incidencias_abiertas' => fn ($q) =>
+                    $q->where('estado', '!=', Incidencia::ESTADO_CERRADA),
+            ]);
+
+            // Filtro por estado
             if ($request->filled('estado')) {
                 $query->where('proyectos.estado', $request->estado);
             }
 
-            // 3. Búsqueda por nombre o código (insensible a mayúsculas/minúsculas)
+            // Filtro por cliente_id
+            if ($request->filled('cliente_id')) {
+                $query->where('proyectos.cliente_id', $request->cliente_id);
+            }
+
+            // Búsqueda por nombre o código
             if ($request->filled('busqueda')) {
                 $termino = $request->busqueda;
                 $query->where(function ($q) use ($termino): void {
@@ -75,43 +67,44 @@ class ProyectoController extends Controller
                 });
             }
 
-            // 4. Ordenar por fecha_fin ascendente: los que vencen antes, primero
+            // Ordenar por fecha_fin ascendente
             $query->orderBy('proyectos.fecha_fin', 'asc');
 
-            // 5. Paginar (10 resultados por página)
+            // Paginar (10 por página)
             $paginado = $query->paginate(10);
 
-            // 6. Transformar cada proyecto al formato de respuesta esperado
+            // Formatear respuesta
             $proyectos = $paginado->getCollection()->map(function (Proyecto $proyecto): array {
-                // El último reporte viene precargado por el eager loading
-                $ultimoReporte = $proyecto->reportesDiarios->first();
+                $ultimoReporte = $proyecto->reportesDiarios()->orderByDesc('fecha_reporte')->first();
 
                 return [
                     'id'        => $proyecto->id,
                     'codigo'    => $proyecto->codigo,
                     'nombre'    => $proyecto->nombre,
+                    'descripcion' => $proyecto->descripcion,
                     'ubicacion' => $proyecto->ubicacion,
                     'estado'    => $proyecto->estado,
-                    'avance'    => $proyecto->avance,
-
-                    // KPIs rápidos calculados con withCount (sin subconsultas adicionales)
+                    'avance'    => (float) $proyecto->avance,
+                    'fecha_inicio' => $proyecto->fecha_inicio ? $proyecto->fecha_inicio->format('Y-m-d') : null,
+                    'fecha_fin'    => $proyecto->fecha_fin ? $proyecto->fecha_fin->format('Y-m-d') : null,
+                    'presupuesto'  => $proyecto->presupuesto ? (float) $proyecto->presupuesto : null,
+                    'cliente'   => $proyecto->cliente ? [
+                        'id'     => $proyecto->cliente->id,
+                        'nombre' => $proyecto->cliente->razon_social
+                    ] : null,
                     'kpis' => [
-                        'total_reportes'       => $proyecto->total_reportes,
-                        'total_incidencias'    => $proyecto->total_incidencias,
-                        'incidencias_abiertas' => $proyecto->incidencias_abiertas,
+                        'total_reportes'       => (int) $proyecto->total_reportes,
+                        'total_incidencias'    => (int) $proyecto->total_incidencias,
+                        'incidencias_abiertas' => (int) $proyecto->incidencias_abiertas,
                         'ultimo_reporte'       => $ultimoReporte ? [
-                            'fecha_reporte' => $ultimoReporte->fecha_reporte,
-                            'avance'        => $ultimoReporte->avance,
+                            'fecha_reporte' => $ultimoReporte->fecha_reporte ? Carbon::parse($ultimoReporte->fecha_reporte)->format('Y-m-d') : null,
+                            'avance'        => (float) $ultimoReporte->avance,
                         ] : null,
                     ],
-
-                    // Conteo del personal asignado al proyecto
-                    'personal_asignado' => $proyecto->usuarios_count
-                        ?? $proyecto->usuarios()->count(),
+                    'personal_asignado' => (int) $proyecto->usuariosActivos()->count(),
                 ];
             });
 
-            // 7. Reconstruir la paginación con los datos transformados
             $paginado->setCollection($proyectos);
 
             return response()->json([
@@ -130,24 +123,92 @@ class ProyectoController extends Controller
     }
 
     // =========================================================================
-    // SHOW — Detalle completo de un proyecto
+    // STORE — Crear nuevo proyecto con asignaciones
     // =========================================================================
+    public function store(ProyectoStoreRequest $request): JsonResponse
+    {
+        // 1. Autorización de rol
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para crear proyectos.',
+            ], 403);
+        }
 
-    /**
-     * Retorna el detalle completo de un proyecto, incluyendo KPIs calculados,
-     * personal asignado, últimos 5 reportes y últimas 5 incidencias.
-     *
-     * Verifica que el usuario autenticado tenga acceso al proyecto antes de
-     * devolver cualquier información.
-     *
-     * @param  Request  $request  Petición autenticada.
-     * @param  int      $id       ID del proyecto a consultar.
-     * @return JsonResponse
-     */
+        try {
+            $proyecto = DB::transaction(function () use ($request) {
+                // Generar código si no se envió
+                $codigo = $request->input('codigo') ?? Proyecto::generarCodigo();
+
+                // Crear proyecto
+                $proyecto = Proyecto::create([
+                    'codigo'         => $codigo,
+                    'nombre'         => $request->nombre,
+                    'descripcion'    => $request->descripcion,
+                    'ubicacion'      => $request->ubicacion,
+                    'latitud'        => $request->latitud,
+                    'longitud'       => $request->longitud,
+                    'fecha_inicio'   => $request->fecha_inicio,
+                    'fecha_fin'      => $request->fecha_fin,
+                    'presupuesto'    => $request->presupuesto,
+                    'avance'         => $request->avance ?? 0,
+                    'estado'         => $request->estado ?? 'planeado',
+                    'cliente_id'     => $request->cliente_id,
+                    'empresa_id'     => $request->user()->empresa_id,
+                    'imagen_portada' => $request->imagen_portada,
+                    'creado_por'     => $request->user()->id,
+                ]);
+
+                // Asignar personal si viene en la petición
+                if ($request->filled('asignaciones')) {
+                    foreach ($request->asignaciones as $asignacion) {
+                        $usuario = Usuario::find($asignacion['usuario_id']);
+                        if ($usuario && $usuario->activo) {
+                            $proyecto->asignarUsuario($usuario->id, $asignacion['rol']);
+                        }
+                    }
+                }
+
+                return $proyecto;
+            });
+
+            // Cargar relaciones para la respuesta
+            $proyecto->load(['cliente', 'usuariosActivos']);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Proyecto creado correctamente',
+                'data'    => [
+                    'id'       => $proyecto->id,
+                    'codigo'   => $proyecto->codigo,
+                    'nombre'   => $proyecto->nombre,
+                    'cliente'  => $proyecto->cliente ? [
+                        'id'     => $proyecto->cliente->id,
+                        'nombre' => $proyecto->cliente->razon_social
+                    ] : null,
+                    'usuarios' => $proyecto->usuariosActivos->map(fn ($u) => [
+                        'id'     => $u->id,
+                        'nombre' => $u->nombre,
+                        'rol'    => $u->pivot->rol_en_proyecto
+                    ])->values()
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al crear el proyecto.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // SHOW — Detalle de un proyecto
+    // =========================================================================
     public function show(Request $request, int $id): JsonResponse
     {
         try {
-            // 1. Verificar que el proyecto exista
             $proyecto = Proyecto::find($id);
 
             if (! $proyecto) {
@@ -157,11 +218,13 @@ class ProyectoController extends Controller
                 ], 404);
             }
 
-            // 2. Verificar que el usuario autenticado esté asignado al proyecto
-            $tieneAcceso = $request->user()
-                ->proyectos()
-                ->where('proyectos.id', $id)
-                ->exists();
+            // Verificar acceso
+            $user = $request->user();
+            if ($user->tieneRol(['gerente', 'administrador'])) {
+                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
+            } else {
+                $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
+            }
 
             if (! $tieneAcceso) {
                 return response()->json([
@@ -170,123 +233,41 @@ class ProyectoController extends Controller
                 ], 403);
             }
 
-            // 3. Cargar el proyecto con todas sus relaciones necesarias
             $proyecto->load([
                 'cliente',
-                // Personal asignado con su rol en el proyecto (del pivot)
-                'usuarios' => fn ($q) =>
+                'usuariosActivos' => fn ($q) =>
                     $q->select('usuarios.id', 'usuarios.nombre', 'usuarios.email', 'usuarios.telefono'),
-
-                // Últimos 5 reportes con el nombre del usuario que lo elaboró
-                'reportesDiarios' => fn ($q) =>
-                    $q->select('reportes_diarios.id', 'proyecto_id', 'usuario_id',
-                               'fecha_reporte', 'avance', 'categoria', 'turno')
-                      ->with(['usuario:id,nombre'])
-                      ->orderByDesc('fecha_reporte')
-                      ->limit(5),
-
-                // Últimas 5 incidencias con el nombre del reportante
-                'incidencias' => fn ($q) =>
-                    $q->select('incidencias.id', 'proyecto_id', 'reportante_id',
-                               'titulo', 'severidad', 'estado', 'created_at')
-                      ->with(['reportante:id,nombre'])
-                      ->orderByDesc('created_at')
-                      ->limit(5),
             ]);
-
-            // 4. Calcular KPIs de tiempo basados en fechas del proyecto
-            $hoy              = Carbon::today();
-            $fechaInicio      = $proyecto->fecha_inicio
-                                    ? Carbon::parse($proyecto->fecha_inicio)
-                                    : null;
-            $fechaFin         = $proyecto->fecha_fin
-                                    ? Carbon::parse($proyecto->fecha_fin)
-                                    : null;
-
-            $diasTranscurridos = $fechaInicio ? $fechaInicio->diffInDays($hoy) : null;
-            $diasTotales       = ($fechaInicio && $fechaFin)
-                                    ? $fechaInicio->diffInDays($fechaFin)
-                                    : null;
-            $diasRestantes     = ($diasTotales !== null && $diasTranscurridos !== null)
-                                    ? max(0, $diasTotales - $diasTranscurridos)
-                                    : null;
-
-            // 5. Calcular KPIs de incidencias (consultas directas y eficientes)
-            $incidenciasActivas  = $proyecto->incidencias()
-                ->where('estado', '!=', Incidencia::ESTADO_CERRADA)
-                ->count();
-
-            $incidenciasCriticas = $proyecto->incidencias()
-                ->where('severidad', Incidencia::SEVERIDAD_CRITICA)
-                ->where('estado', '!=', Incidencia::ESTADO_CERRADA)
-                ->count();
-
-            // 6. Formatear el personal asignado incluyendo el rol del pivot
-            $personal = $proyecto->usuarios->map(fn ($usuario) => [
-                'id'               => $usuario->id,
-                'nombre'           => $usuario->nombre,
-                'email'            => $usuario->email,
-                'telefono'         => $usuario->telefono,
-                'rol_en_proyecto'  => $usuario->pivot->rol_en_proyecto,
-            ])->values();
-
-            // 7. Formatear los últimos 5 reportes
-            $ultimosReportes = $proyecto->reportesDiarios->map(fn ($reporte) => [
-                'id'            => $reporte->id,
-                'fecha_reporte' => $reporte->fecha_reporte,
-                'avance'        => $reporte->avance,
-                'categoria'     => $reporte->categoria,
-                'turno'         => $reporte->turno,
-                'usuario'       => $reporte->usuario
-                                    ? ['nombre' => $reporte->usuario->nombre]
-                                    : null,
-            ])->values();
-
-            // 8. Formatear las últimas 5 incidencias
-            $ultimasIncidencias = $proyecto->incidencias->map(fn ($incidencia) => [
-                'id'         => $incidencia->id,
-                'titulo'     => $incidencia->titulo,
-                'severidad'  => $incidencia->severidad,
-                'estado'     => $incidencia->estado,
-                'fecha'      => $incidencia->created_at,
-                'reportante' => $incidencia->reportante
-                                    ? ['nombre' => $incidencia->reportante->nombre]
-                                    : null,
-            ])->values();
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Detalle del proyecto obtenido correctamente.',
+                'message' => 'Proyecto obtenido correctamente',
                 'data'    => [
-                    // Datos generales del proyecto
                     'id'          => $proyecto->id,
                     'codigo'      => $proyecto->codigo,
                     'nombre'      => $proyecto->nombre,
-                    'cliente'     => $proyecto->cliente,
-                    'ubicacion'   => $proyecto->ubicacion,
                     'descripcion' => $proyecto->descripcion,
+                    'ubicacion'   => $proyecto->ubicacion,
+                    'latitud'     => $proyecto->latitud ? (float) $proyecto->latitud : null,
+                    'longitud'    => $proyecto->longitud ? (float) $proyecto->longitud : null,
+                    'fecha_inicio' => $proyecto->fecha_inicio ? $proyecto->fecha_inicio->format('Y-m-d') : null,
+                    'fecha_fin'    => $proyecto->fecha_fin ? $proyecto->fecha_fin->format('Y-m-d') : null,
+                    'presupuesto'  => $proyecto->presupuesto ? (float) $proyecto->presupuesto : null,
+                    'avance'      => (float) $proyecto->avance,
                     'estado'      => $proyecto->estado,
-                    'avance'      => $proyecto->avance,
-                    'fecha_inicio' => $proyecto->fecha_inicio,
-                    'fecha_fin'    => $proyecto->fecha_fin,
-
-                    // KPIs detallados del proyecto
-                    'kpis' => [
-                        'avance_total'         => $proyecto->avance,
-                        'dias_transcurridos'   => $diasTranscurridos,
-                        'dias_totales'         => $diasTotales,
-                        'dias_restantes'       => $diasRestantes,
-                        'incidencias_activas'  => $incidenciasActivas,
-                        'incidencias_criticas' => $incidenciasCriticas,
-                    ],
-
-                    // Personal asignado con su rol en el proyecto
-                    'personal_asignado' => $personal,
-
-                    // Resumen de los últimos reportes e incidencias
-                    'ultimos_reportes'    => $ultimosReportes,
-                    'ultimas_incidencias' => $ultimasIncidencias,
-                ],
+                    'imagen_portada' => $proyecto->imagen_portada,
+                    'cliente'     => $proyecto->cliente ? [
+                        'id'     => $proyecto->cliente->id,
+                        'nombre' => $proyecto->cliente->razon_social
+                    ] : null,
+                    'usuarios'    => $proyecto->usuariosActivos->map(fn ($u) => [
+                        'id'       => $u->id,
+                        'nombre'   => $u->nombre,
+                        'email'    => $u->email,
+                        'telefono' => $u->telefono,
+                        'rol'      => $u->pivot->rol_en_proyecto
+                    ])->values()
+                ]
             ], 200);
 
         } catch (\Exception $e) {
@@ -299,24 +280,265 @@ class ProyectoController extends Controller
     }
 
     // =========================================================================
-    // ACTIVIDAD — Feed de actividad reciente del proyecto
+    // UPDATE — Actualizar proyecto y asignaciones
     // =========================================================================
+    public function update(ProyectoUpdateRequest $request, int $id): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para editar proyectos.',
+            ], 403);
+        }
 
-    /**
-     * Retorna los 10 eventos más recientes del proyecto, combinando
-     * reportes diarios e incidencias en un feed cronológico unificado.
-     *
-     * Cada item de actividad tiene el mismo formato independientemente
-     * de su tipo (reporte o incidencia), facilitando su renderizado en la app.
-     *
-     * @param  Request  $request  Petición autenticada.
-     * @param  int      $id       ID del proyecto a consultar.
-     * @return JsonResponse
-     */
-    public function actividad(Request $request, int $id): JsonResponse
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            DB::transaction(function () use ($request, $proyecto) {
+                $proyecto->update($request->only([
+                    'nombre', 'descripcion', 'ubicacion', 'latitud', 'longitud',
+                    'fecha_inicio', 'fecha_fin', 'presupuesto', 'avance', 'estado',
+                    'cliente_id', 'imagen_portada'
+                ]));
+
+                // Si se envían asignaciones, actualizar (desactivar anteriores y asignar nuevas)
+                if ($request->has('asignaciones')) {
+                    // Desactivar todas las asignaciones activas actuales
+                    $proyecto->usuariosActivos()->updateExistingPivot(
+                        $proyecto->usuariosActivos->pluck('id'),
+                        ['activo' => false]
+                    );
+
+                    // Agregar/reactivar las nuevas asignaciones
+                    foreach ($request->asignaciones as $asignacion) {
+                        $usuario = Usuario::find($asignacion['usuario_id']);
+                        if ($usuario && $usuario->activo) {
+                            $proyecto->asignarUsuario($usuario->id, $asignacion['rol']);
+                        }
+                    }
+                }
+            });
+
+            $proyecto->load(['cliente', 'usuariosActivos']);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Proyecto actualizado correctamente',
+                'data'    => [
+                    'id'       => $proyecto->id,
+                    'codigo'   => $proyecto->codigo,
+                    'nombre'   => $proyecto->nombre,
+                    'cliente'  => $proyecto->cliente ? [
+                        'id'     => $proyecto->cliente->id,
+                        'nombre' => $proyecto->cliente->razon_social
+                    ] : null,
+                    'usuarios' => $proyecto->usuariosActivos->map(fn ($u) => [
+                        'id'     => $u->id,
+                        'nombre' => $u->nombre,
+                        'rol'    => $u->pivot->rol_en_proyecto
+                    ])->values()
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al actualizar el proyecto.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // DESTROY — Desactivar proyecto (Soft Delete)
+    // =========================================================================
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para eliminar proyectos.',
+            ], 403);
+        }
+
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            $proyecto->delete(); // Soft delete
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Proyecto desactivado correctamente.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al desactivar el proyecto.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // ASIGNAR USUARIO — Asignar usuario individual
+    // =========================================================================
+    public function asignarUsuario(AsignacionRequest $request, int $id): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para asignar personal.',
+            ], 403);
+        }
+
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            $usuario = Usuario::find($request->usuario_id);
+
+            if (! $usuario->activo) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El usuario seleccionado está inactivo y no se puede asignar.',
+                ], 422);
+            }
+
+            $proyecto->asignarUsuario($usuario->id, $request->rol);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Usuario asignado correctamente',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al asignar usuario.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // REMOVER USUARIO — Remover usuario individual
+    // =========================================================================
+    public function removerUsuario(Request $request, int $id, int $usuarioId): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para remover personal.',
+            ], 403);
+        }
+
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            $removido = $proyecto->removerUsuario($usuarioId);
+
+            if (! $removido) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El usuario no está asignado activamente en este proyecto.',
+                ], 422);
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Usuario removido correctamente',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al remover usuario.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // USUARIOS DISPONIBLES — Listar usuarios de la empresa no asignados
+    // =========================================================================
+    public function usuariosDisponibles(Request $request, int $id): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No autorizado.',
+            ], 403);
+        }
+
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            // Obtener los IDs de usuarios asignados activamente
+            $asignadosIds = $proyecto->usuariosActivos()->pluck('usuarios.id')->toArray();
+
+            // Filtrar usuarios de la misma empresa, activos, que no estén asignados
+            $usuarios = Usuario::where('empresa_id', $request->user()->empresa_id)
+                ->where('activo', true)
+                ->whereNotIn('id', $asignadosIds)
+                ->orderBy('nombre', 'asc')
+                ->get(['id', 'nombre', 'email', 'telefono']);
+
+            return response()->json([
+                'status'  => 'success',
+                'data'    => $usuarios,
+                'message' => 'Usuarios disponibles obtenidos correctamente.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al obtener usuarios disponibles.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // KPIS — Obtener KPIs del proyecto
+    // =========================================================================
+    public function kpis(Request $request, int $id): JsonResponse
     {
         try {
-            // 1. Verificar que el proyecto exista
             $proyecto = Proyecto::find($id);
 
             if (! $proyecto) {
@@ -326,11 +548,13 @@ class ProyectoController extends Controller
                 ], 404);
             }
 
-            // 2. Verificar que el usuario autenticado tenga acceso al proyecto
-            $tieneAcceso = $request->user()
-                ->proyectos()
-                ->where('proyectos.id', $id)
-                ->exists();
+            // Verificar acceso
+            $user = $request->user();
+            if ($user->tieneRol(['gerente', 'administrador'])) {
+                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
+            } else {
+                $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
+            }
 
             if (! $tieneAcceso) {
                 return response()->json([
@@ -339,7 +563,80 @@ class ProyectoController extends Controller
                 ], 403);
             }
 
-            // 3. Obtener los últimos reportes del proyecto con el nombre del autor
+            // Reportes
+            $totalReportes = $proyecto->reportesDiarios()->count();
+
+            // Incidencias
+            $totalIncidencias = $proyecto->incidencias()->count();
+            $incidenciasAbiertas = $proyecto->incidencias()->where('estado', '!=', Incidencia::ESTADO_CERRADA)->count();
+            $incidenciasCerradas = $proyecto->incidencias()->where('estado', Incidencia::ESTADO_CERRADA)->count();
+
+            // Tiempo / Fechas
+            $hoy = Carbon::today();
+            $fechaInicio = $proyecto->fecha_inicio ? Carbon::parse($proyecto->fecha_inicio) : null;
+            $fechaFin = $proyecto->fecha_fin ? Carbon::parse($proyecto->fecha_fin) : null;
+
+            $diasRestantes = 0;
+            if ($fechaFin) {
+                $diasRestantes = $hoy->greaterThan($fechaFin) ? 0 : $hoy->diffInDays($fechaFin);
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'data'    => [
+                    'avance'               => (float) $proyecto->avance,
+                    'total_incidencias'    => $totalIncidencias,
+                    'incidencias_abiertas' => $incidenciasAbiertas,
+                    'incidencias_cerradas' => $incidenciasCerradas,
+                    'total_reportes'       => $totalReportes,
+                    'presupuesto'          => $proyecto->presupuesto ? (float) $proyecto->presupuesto : null,
+                    'fecha_inicio'         => $fechaInicio ? $fechaInicio->format('Y-m-d') : null,
+                    'fecha_fin'            => $fechaFin ? $fechaFin->format('Y-m-d') : null,
+                    'dias_restantes'       => $diasRestantes,
+                ],
+                'message' => 'KPIs obtenidos correctamente.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al obtener los KPIs del proyecto.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // ACTIVIDAD — Feed de actividad reciente del proyecto (original)
+    // =========================================================================
+    public function actividad(Request $request, int $id): JsonResponse
+    {
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            // Verificar acceso
+            $user = $request->user();
+            if ($user->tieneRol(['gerente', 'administrador'])) {
+                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
+            } else {
+                $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
+            }
+
+            if (! $tieneAcceso) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes acceso a este proyecto.',
+                ], 403);
+            }
+
+            // Obtener los últimos reportes
             $reportes = ReporteDiario::where('proyecto_id', $id)
                 ->with(['usuario:id,nombre'])
                 ->orderByDesc('created_at')
@@ -353,13 +650,12 @@ class ProyectoController extends Controller
                         number_format((float) $reporte->avance, 1),
                         $reporte->turno ?? 'sin especificar'
                     ),
-                    'usuario' => $reporte->usuario?->nombre ?? 'Usuario desconocido',
-                    'fecha'   => $reporte->created_at,
-                    // Campo auxiliar para ordenar el feed unificado
+                    'usuario'  => $reporte->usuario?->nombre ?? 'Usuario desconocido',
+                    'fecha'    => $reporte->created_at,
                     '_sort_at' => $reporte->created_at,
                 ]);
 
-            // 4. Obtener las últimas incidencias del proyecto con el nombre del reportante
+            // Obtener las últimas incidencias
             $incidencias = Incidencia::where('proyecto_id', $id)
                 ->with(['reportante:id,nombre'])
                 ->orderByDesc('created_at')
@@ -374,18 +670,17 @@ class ProyectoController extends Controller
                         $incidencia->severidad,
                         $incidencia->estado
                     ),
-                    'usuario' => $incidencia->reportante?->nombre ?? 'Usuario desconocido',
-                    'fecha'   => $incidencia->created_at,
+                    'usuario'  => $incidencia->reportante?->nombre ?? 'Usuario desconocido',
+                    'fecha'    => $incidencia->created_at,
                     '_sort_at' => $incidencia->created_at,
                 ]);
 
-            // 5. Combinar ambas colecciones, ordenar por fecha descendente y tomar 10
+            // Combinar y ordenar
             $actividades = $reportes
                 ->concat($incidencias)
                 ->sortByDesc('_sort_at')
                 ->take(10)
                 ->map(fn ($item) => [
-                    // Eliminar el campo auxiliar de ordenamiento antes de retornar
                     'tipo'        => $item['tipo'],
                     'titulo'      => $item['titulo'],
                     'descripcion' => $item['descripcion'],
