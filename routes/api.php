@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\IncidenciaController;
 use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\ProyectoController;
@@ -88,6 +89,30 @@ Route::middleware('auth:sanctum')->group(function (): void {
     });
 
     // =========================================================================
+    // MÓDULO 5: Clientes
+    // =========================================================================
+
+    /** GET /api/clientes — Listado de clientes activos de la empresa */
+    Route::get('/clientes', [ClienteController::class, 'index'])
+         ->name('clientes.index');
+
+    /** GET /api/clientes/search — Búsqueda de clientes por nombre o RFC */
+    Route::get('/clientes/search', [ClienteController::class, 'search'])
+         ->name('clientes.search');
+
+    /** POST /api/clientes — Crear nuevo cliente */
+    Route::post('/clientes', [ClienteController::class, 'store'])
+         ->name('clientes.store');
+
+    /** PUT /api/clientes/{id} — Actualizar cliente existente */
+    Route::put('/clientes/{id}', [ClienteController::class, 'update'])
+         ->name('clientes.update');
+
+    /** PATCH /api/clientes/{id}/desactivar — Desactivar cliente (sin eliminar) */
+    Route::patch('/clientes/{id}/desactivar', [ClienteController::class, 'desactivar'])
+         ->name('clientes.desactivar');
+
+    // =========================================================================
     // MÓDULO 7: Proveedores
     // =========================================================================
 
@@ -134,5 +159,28 @@ Route::middleware('auth:sanctum')->group(function (): void {
     /** PATCH /api/materiales/{id}/desactivar — Desactivar material (sin eliminar) */
     Route::patch('/materiales/{id}/desactivar', [MaterialController::class, 'desactivar'])
          ->name('materiales.desactivar');
+
+    // =========================================================================
+    // MÓDULO 9: Inventario
+    // =========================================================================
+    Route::prefix('inventario')->name('inventario.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\InventarioController::class, 'index'])->name('index');
+        Route::get('/bajo-stock', [App\Http\Controllers\Api\InventarioController::class, 'bajoStock'])->name('bajo-stock');
+        Route::get('/historial', [App\Http\Controllers\Api\InventarioController::class, 'historial'])->name('historial');
+        Route::post('/movimiento', [App\Http\Controllers\Api\InventarioController::class, 'registrarMovimiento'])->name('movimiento');
+    });
+
+    // =========================================================================
+    // MÓDULO 10: Cotizaciones
+    // =========================================================================
+    Route::prefix('cotizaciones')->name('cotizaciones.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\CotizacionController::class, 'index'])->name('index');
+        Route::get('/search', [App\Http\Controllers\Api\CotizacionController::class, 'search'])->name('search');
+        Route::get('/generar-folio', [App\Http\Controllers\Api\CotizacionController::class, 'generarFolio'])->name('generar-folio');
+        Route::post('/', [App\Http\Controllers\Api\CotizacionController::class, 'store'])->name('store');
+        Route::get('/{id}', [App\Http\Controllers\Api\CotizacionController::class, 'show'])->name('show');
+        Route::post('/{id}/convertir-venta', [App\Http\Controllers\Api\CotizacionController::class, 'convertirAVenta'])->name('convertir-venta');
+        Route::get('/{id}/pdf', [App\Http\Controllers\Api\CotizacionController::class, 'datosPdf'])->name('pdf');
+    });
 });
 

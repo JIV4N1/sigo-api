@@ -16,6 +16,7 @@ class Cliente extends Model
         'telefono',
         'email',
         'direccion',
+        'empresa_id',
         'activo',
     ];
 
