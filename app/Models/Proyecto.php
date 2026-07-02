@@ -215,8 +215,7 @@ class Proyecto extends Model
     public function usuarios(): BelongsToMany
     {
         return $this->belongsToMany(Usuario::class, 'proyecto_usuario', 'proyecto_id', 'usuario_id')
-                    ->withPivot('rol_en_proyecto', 'asignado_el', 'activo')
-                    ->withTimestamps();
+                    ->withPivot('rol_en_proyecto', 'asignado_el', 'activo');
     }
 
     /**
