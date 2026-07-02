@@ -38,6 +38,15 @@ class Proyecto extends Model
     use SoftDeletes;
 
     /**
+     * Atributos agregados a las respuestas JSON.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'mi_rol',
+    ];
+
+    /**
      * Nombre de la tabla en la base de datos.
      */
     protected $table = 'proyectos';
@@ -103,6 +112,27 @@ class Proyecto extends Model
             'longitud'     => 'float',
             'deleted_at'   => 'datetime',
         ];
+    }
+
+    /**
+     * Atributo virtual para obtener el rol del usuario actual en el proyecto.
+     * 
+     * @return string|null
+     */
+    public function getMiRolAttribute(): ?string
+    {
+        // Retornar si fue asignado dinámicamente en el controlador
+        if (array_key_exists('mi_rol', $this->attributes)) {
+            return $this->attributes['mi_rol'];
+        }
+
+        // Si hay una sesión activa, intentar obtener el rol automáticamente
+        if (auth()->check()) {
+            $asignacion = $this->usuariosActivos()->where('usuario_id', auth()->id())->first();
+            return $asignacion ? $asignacion->pivot->rol_en_proyecto : null;
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------

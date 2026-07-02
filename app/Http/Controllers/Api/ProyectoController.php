@@ -74,8 +74,12 @@ class ProyectoController extends Controller
             $paginado = $query->paginate(10);
 
             // Formatear respuesta
-            $proyectos = $paginado->getCollection()->map(function (Proyecto $proyecto): array {
+            $proyectos = $paginado->getCollection()->map(function (Proyecto $proyecto) use ($user): array {
                 $ultimoReporte = $proyecto->reportesDiarios()->orderByDesc('fecha_reporte')->first();
+
+                // Buscar el pivot en proyecto_usuario para el usuario autenticado
+                $pivot = $proyecto->usuariosActivos()->where('usuarios.id', $user->id)->first()?->pivot;
+                $proyecto->mi_rol = $pivot->rol_en_proyecto ?? null;
 
                 return [
                     'id'        => $proyecto->id,
@@ -92,6 +96,7 @@ class ProyectoController extends Controller
                         'id'     => $proyecto->cliente->id,
                         'nombre' => $proyecto->cliente->razon_social
                     ] : null,
+                    'mi_rol'    => $proyecto->mi_rol,
                     'kpis' => [
                         'total_reportes'       => (int) $proyecto->total_reportes,
                         'total_incidencias'    => (int) $proyecto->total_incidencias,
@@ -239,6 +244,10 @@ class ProyectoController extends Controller
                     $q->select('usuarios.id', 'usuarios.nombre', 'usuarios.email', 'usuarios.telefono'),
             ]);
 
+            // Determinar mi_rol para el detalle del proyecto
+            $pivot = $proyecto->usuariosActivos()->where('usuarios.id', $user->id)->first()?->pivot;
+            $proyecto->mi_rol = $pivot->rol_en_proyecto ?? null;
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Proyecto obtenido correctamente',
@@ -260,6 +269,7 @@ class ProyectoController extends Controller
                         'id'     => $proyecto->cliente->id,
                         'nombre' => $proyecto->cliente->razon_social
                     ] : null,
+                    'mi_rol'      => $proyecto->mi_rol,
                     'usuarios'    => $proyecto->usuariosActivos->map(fn ($u) => [
                         'id'       => $u->id,
                         'nombre'   => $u->nombre,
