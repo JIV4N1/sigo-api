@@ -156,7 +156,7 @@ class Proyecto extends Model
         $ultimoId = static::withTrashed()->max('id') ?? 0;
         $siguiente = $ultimoId + 1;
 
-        return 'OBR-' . str_pad($siguiente, 6, '0', STR_PAD_LEFT);
+        return 'PROY-' . str_pad($siguiente, 3, '0', STR_PAD_LEFT);
     }
 
     // -------------------------------------------------------------------------

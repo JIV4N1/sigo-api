@@ -68,15 +68,13 @@ class ReporteController extends Controller
             }
 
             // 3. Construir la consulta con eager loading para evitar N+1.
-            //    Se usa withCount para las fotos y se carga la foto principal.
             $query = ReporteDiario::where('proyecto_id', $id)
                 ->with([
-                    // Solo el nombre del usuario que elaboró el reporte
+                    // Nombre del usuario que elaboró el reporte
                     'usuario:id,nombre',
-                    // Foto principal para miniatura en el listado
-                    'fotoPrincipal:id,reporte_id,ruta_imagen,es_principal',
-                ])
-                ->withCount('fotos'); // fotos_count
+                    // Todas las fotos del reporte
+                    'fotos:id,reporte_id,ruta_imagen,es_principal',
+                ]);
 
             // 4. Filtro por rango de fechas
             if ($request->filled('desde')) {
@@ -105,10 +103,13 @@ class ReporteController extends Controller
 
             // 9. Transformar cada reporte al formato de respuesta esperado
             $reportes = $paginado->getCollection()->map(function (ReporteDiario $reporte): array {
-                // Construir URL pública de la foto principal si existe
-                $fotoPrincipal = $reporte->fotoPrincipal
-                    ? Storage::disk('public')->url($reporte->fotoPrincipal->ruta_imagen)
-                    : null;
+                $fotos = $reporte->fotos->map(function ($foto) {
+                    return [
+                        'id' => $foto->id,
+                        'ruta_imagen' => Storage::disk('public')->url($foto->ruta_imagen),
+                        'es_principal' => (bool)$foto->es_principal
+                    ];
+                });
 
                 return [
                     'id'            => $reporte->id,
@@ -127,8 +128,7 @@ class ReporteController extends Controller
                         : null,
 
                     // Información de fotos adjuntas
-                    'fotos_count'   => $reporte->fotos_count,
-                    'foto_principal' => $fotoPrincipal,
+                    'fotos'         => $fotos,
                 ];
             });
 

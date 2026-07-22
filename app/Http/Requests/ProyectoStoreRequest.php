@@ -33,7 +33,7 @@ class ProyectoStoreRequest extends FormRequest
             // --- Datos generales ---
             'nombre'       => 'required|string|max:200',
             'descripcion'  => 'nullable|string',
-            'ubicacion'    => 'nullable|string|max:300',
+            'ubicacion'    => 'required|string|max:300',
             'latitud'      => 'nullable|numeric|between:-90,90',
             'longitud'     => 'nullable|numeric|between:-180,180',
 
@@ -53,12 +53,13 @@ class ProyectoStoreRequest extends FormRequest
             'cliente_id'   => 'nullable|integer|exists:clientes,id',
 
             // --- Imagen ---
-            'imagen_portada' => 'nullable|string|max:255',
+            'imagen_portada' => 'nullable',
 
             // --- Asignaciones de personal (opcional al crear) ---
-            'asignaciones'          => 'nullable|array',
-            'asignaciones.*.usuario_id' => 'required_with:asignaciones|integer|exists:usuarios,id',
-            'asignaciones.*.rol'        => 'required_with:asignaciones|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
+            'asignaciones'                  => 'nullable|array',
+            'asignaciones.*.usuario_id'     => 'required_with:asignaciones|integer|exists:usuarios,id',
+            'asignaciones.*.rol'            => 'nullable|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
+            'asignaciones.*.rol_en_proyecto' => 'nullable|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
         ];
     }
 

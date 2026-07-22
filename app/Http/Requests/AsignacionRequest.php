@@ -30,8 +30,9 @@ class AsignacionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'usuario_id' => 'required|integer|exists:usuarios,id',
-            'rol'        => 'required|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
+            'usuario_id'      => 'required|integer|exists:usuarios,id',
+            'rol'             => 'nullable|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
+            'rol_en_proyecto' => 'nullable|string|in:' . implode(',', Proyecto::ROLES_PROYECTO),
         ];
     }
 

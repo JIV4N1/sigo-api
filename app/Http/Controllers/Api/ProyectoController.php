@@ -145,6 +145,15 @@ class ProyectoController extends Controller
                 // Generar código si no se envió
                 $codigo = $request->input('codigo') ?? Proyecto::generarCodigo();
 
+                // Manejo de imagen portada (archivo subido o string)
+                $imagenPortadaPath = null;
+                if ($request->hasFile('imagen_portada')) {
+                    $path = $request->file('imagen_portada')->store('proyectos', 'public');
+                    $imagenPortadaPath = '/storage/' . $path;
+                } else {
+                    $imagenPortadaPath = $request->input('imagen_portada');
+                }
+
                 // Crear proyecto
                 $proyecto = Proyecto::create([
                     'codigo'         => $codigo,
@@ -160,7 +169,7 @@ class ProyectoController extends Controller
                     'estado'         => $request->estado ?? 'planeado',
                     'cliente_id'     => $request->cliente_id,
                     'empresa_id'     => $request->user()->empresa_id,
-                    'imagen_portada' => $request->imagen_portada,
+                    'imagen_portada' => $imagenPortadaPath,
                     'creado_por'     => $request->user()->id,
                 ]);
 
@@ -169,7 +178,8 @@ class ProyectoController extends Controller
                     foreach ($request->asignaciones as $asignacion) {
                         $usuario = Usuario::find($asignacion['usuario_id']);
                         if ($usuario && $usuario->activo) {
-                            $proyecto->asignarUsuario($usuario->id, $asignacion['rol']);
+                            $rol = $asignacion['rol_en_proyecto'] ?? $asignacion['rol'] ?? 'trabajador';
+                            $proyecto->asignarUsuario($usuario->id, $rol);
                         }
                     }
                 }
@@ -184,14 +194,27 @@ class ProyectoController extends Controller
                 'status'  => 'success',
                 'message' => 'Proyecto creado correctamente',
                 'data'    => [
-                    'id'       => $proyecto->id,
-                    'codigo'   => $proyecto->codigo,
-                    'nombre'   => $proyecto->nombre,
-                    'cliente'  => $proyecto->cliente ? [
+                    'id'             => $proyecto->id,
+                    'codigo'         => $proyecto->codigo,
+                    'nombre'         => $proyecto->nombre,
+                    'descripcion'    => $proyecto->descripcion,
+                    'ubicacion'      => $proyecto->ubicacion,
+                    'latitud'        => $proyecto->latitud ? (float) $proyecto->latitud : null,
+                    'longitud'       => $proyecto->longitud ? (float) $proyecto->longitud : null,
+                    'fecha_inicio'   => $proyecto->fecha_inicio ? $proyecto->fecha_inicio->format('Y-m-d') : null,
+                    'fecha_fin'      => $proyecto->fecha_fin ? $proyecto->fecha_fin->format('Y-m-d') : null,
+                    'presupuesto'    => $proyecto->presupuesto ? (float) $proyecto->presupuesto : null,
+                    'avance'         => (float) $proyecto->avance,
+                    'estado'         => $proyecto->estado,
+                    'cliente_id'     => $proyecto->cliente_id,
+                    'empresa_id'     => $proyecto->empresa_id,
+                    'imagen_portada' => $proyecto->imagen_portada,
+                    'creado_por'     => $proyecto->creado_por,
+                    'cliente'        => $proyecto->cliente ? [
                         'id'     => $proyecto->cliente->id,
                         'nombre' => $proyecto->cliente->razon_social
                     ] : null,
-                    'usuarios' => $proyecto->usuariosActivos->map(fn ($u) => [
+                    'usuarios'       => $proyecto->usuariosActivos->map(fn ($u) => [
                         'id'     => $u->id,
                         'nombre' => $u->nombre,
                         'rol'    => $u->pivot->rol_en_proyecto
@@ -312,11 +335,20 @@ class ProyectoController extends Controller
             }
 
             DB::transaction(function () use ($request, $proyecto) {
-                $proyecto->update($request->only([
-                    'nombre', 'descripcion', 'ubicacion', 'latitud', 'longitud',
+                $data = array_filter($request->only([
+                    'codigo', 'nombre', 'descripcion', 'ubicacion', 'latitud', 'longitud',
                     'fecha_inicio', 'fecha_fin', 'presupuesto', 'avance', 'estado',
-                    'cliente_id', 'imagen_portada'
-                ]));
+                    'cliente_id'
+                ]), fn ($val) => $val !== null);
+
+                if ($request->hasFile('imagen_portada')) {
+                    $path = $request->file('imagen_portada')->store('proyectos', 'public');
+                    $data['imagen_portada'] = '/storage/' . $path;
+                } elseif ($request->has('imagen_portada')) {
+                    $data['imagen_portada'] = $request->input('imagen_portada');
+                }
+
+                $proyecto->update($data);
 
                 // Si se envían asignaciones, actualizar (desactivar anteriores y asignar nuevas)
                 if ($request->has('asignaciones')) {
@@ -330,7 +362,8 @@ class ProyectoController extends Controller
                     foreach ($request->asignaciones as $asignacion) {
                         $usuario = Usuario::find($asignacion['usuario_id']);
                         if ($usuario && $usuario->activo) {
-                            $proyecto->asignarUsuario($usuario->id, $asignacion['rol']);
+                            $rol = $asignacion['rol_en_proyecto'] ?? $asignacion['rol'] ?? 'trabajador';
+                            $proyecto->asignarUsuario($usuario->id, $rol);
                         }
                     }
                 }
@@ -342,14 +375,25 @@ class ProyectoController extends Controller
                 'status'  => 'success',
                 'message' => 'Proyecto actualizado correctamente',
                 'data'    => [
-                    'id'       => $proyecto->id,
-                    'codigo'   => $proyecto->codigo,
-                    'nombre'   => $proyecto->nombre,
-                    'cliente'  => $proyecto->cliente ? [
+                    'id'             => $proyecto->id,
+                    'codigo'         => $proyecto->codigo,
+                    'nombre'         => $proyecto->nombre,
+                    'descripcion'    => $proyecto->descripcion,
+                    'ubicacion'      => $proyecto->ubicacion,
+                    'latitud'        => $proyecto->latitud ? (float) $proyecto->latitud : null,
+                    'longitud'       => $proyecto->longitud ? (float) $proyecto->longitud : null,
+                    'fecha_inicio'   => $proyecto->fecha_inicio ? $proyecto->fecha_inicio->format('Y-m-d') : null,
+                    'fecha_fin'      => $proyecto->fecha_fin ? $proyecto->fecha_fin->format('Y-m-d') : null,
+                    'presupuesto'    => $proyecto->presupuesto ? (float) $proyecto->presupuesto : null,
+                    'avance'         => (float) $proyecto->avance,
+                    'estado'         => $proyecto->estado,
+                    'cliente_id'     => $proyecto->cliente_id,
+                    'imagen_portada' => $proyecto->imagen_portada,
+                    'cliente'        => $proyecto->cliente ? [
                         'id'     => $proyecto->cliente->id,
                         'nombre' => $proyecto->cliente->razon_social
                     ] : null,
-                    'usuarios' => $proyecto->usuariosActivos->map(fn ($u) => [
+                    'usuarios'       => $proyecto->usuariosActivos->map(fn ($u) => [
                         'id'     => $u->id,
                         'nombre' => $u->nombre,
                         'rol'    => $u->pivot->rol_en_proyecto
@@ -435,12 +479,41 @@ class ProyectoController extends Controller
                 ], 422);
             }
 
-            $proyecto->asignarUsuario($usuario->id, $request->rol);
+            // Validar que el usuario no esté ya asignado activamente
+            $yaAsignado = $proyecto->usuariosActivos()->where('usuarios.id', $usuario->id)->exists();
+            if ($yaAsignado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'El usuario ya se encuentra asignado a este proyecto.',
+                ], 422);
+            }
+
+            $rol = $request->input('rol_en_proyecto') ?? $request->input('rol') ?? 'trabajador';
+            $proyecto->asignarUsuario($usuario->id, $rol);
+
+            // Obtener el registro pivote de la asignación creada
+            $asignacion = DB::table('proyecto_usuario')
+                ->where('proyecto_id', $proyecto->id)
+                ->where('usuario_id', $usuario->id)
+                ->first();
 
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Usuario asignado correctamente',
-            ], 200);
+                'data'    => [
+                    'id'              => $asignacion->id ?? null,
+                    'proyecto_id'     => $proyecto->id,
+                    'usuario_id'      => $usuario->id,
+                    'rol_en_proyecto' => $rol,
+                    'asignado_el'     => $asignacion->asignado_el ?? now()->toDateTimeString(),
+                    'activo'          => true,
+                    'usuario'         => [
+                        'id'     => $usuario->id,
+                        'nombre' => $usuario->nombre,
+                        'email'  => $usuario->email,
+                    ],
+                ]
+            ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -522,11 +595,33 @@ class ProyectoController extends Controller
             $asignadosIds = $proyecto->usuariosActivos()->pluck('usuarios.id')->toArray();
 
             // Filtrar usuarios de la misma empresa, activos, que no estén asignados
-            $usuarios = Usuario::where('empresa_id', $request->user()->empresa_id)
+            $query = Usuario::where('empresa_id', $request->user()->empresa_id)
                 ->where('activo', true)
                 ->whereNotIn('id', $asignadosIds)
-                ->orderBy('nombre', 'asc')
-                ->get(['id', 'nombre', 'email', 'telefono']);
+                ->with('rol');
+
+            // Filtrar por rol (?rol=supervisor o ?rol=ingeniero)
+            if ($request->filled('rol')) {
+                $rolParam = $request->query('rol');
+                $query->whereHas('rol', function ($q) use ($rolParam) {
+                    if (is_numeric($rolParam)) {
+                        $q->where('id', $rolParam);
+                    } else {
+                        $q->where(DB::raw('LOWER(nombre)'), strtolower($rolParam));
+                    }
+                });
+            }
+
+            $usuarios = $query->orderBy('nombre', 'asc')->get()->map(fn ($u) => [
+                'id'       => $u->id,
+                'nombre'   => $u->nombre,
+                'email'    => $u->email,
+                'telefono' => $u->telefono,
+                'rol'      => $u->rol ? [
+                    'id'     => $u->rol->id,
+                    'nombre' => $u->rol->nombre,
+                ] : null,
+            ]);
 
             return response()->json([
                 'status'  => 'success',

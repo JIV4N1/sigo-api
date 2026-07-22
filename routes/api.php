@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ProyectoController;
 use App\Http\Controllers\Api\ProveedorController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\AsistenciaController;
+use App\Http\Controllers\Api\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -28,6 +29,11 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 // =============================================================================
 
 Route::middleware('auth:sanctum')->group(function (): void {
+
+    // =========================================================================
+    // MÓDULO: Usuarios
+    // =========================================================================
+    Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
 
     // =========================================================================
     // MÓDULO 2: Proyectos
@@ -60,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     /** GET /api/proyectos/{id}/incidencias — Listado paginado con filtros */
     Route::get('/proyectos/{id}/incidencias', [IncidenciaController::class, 'index'])
          ->name('incidencias.index');
+
+    /** GET /api/incidencias-asignadas — Listado de incidencias asignadas al usuario */
+    Route::get('/incidencias-asignadas', [IncidenciaController::class, 'incidenciasAsignadas'])
+         ->name('incidencias.asignadas');
 
     /** POST /api/incidencias — Crear nueva incidencia (con fotos opcionales) */
     Route::post('/incidencias', [IncidenciaController::class, 'store'])

@@ -261,8 +261,18 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Incidencia no encontrada.'], 404);
             }
 
+            $user = $request->user();
+
             if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
+            }
+
+            // Solo el ingeniero asignado (o un administrador/gerente) puede cambiar el estado
+            if ($incidencia->asignado_a !== $user->id && ! $user->tieneRol(['gerente', 'administrador'])) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo el ingeniero asignado puede cambiar el estado de esta incidencia.'
+                ], 403);
             }
 
             // Validar payload
@@ -535,6 +545,66 @@ class IncidenciaController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Datos inválidos.', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return $this->errorResponse('Error al agregar el comentario.', $e);
+        }
+    }
+
+    // =========================================================================
+    // INCIDENCIAS ASIGNADAS AL USUARIO (Cross-project)
+    // =========================================================================
+    public function incidenciasAsignadas(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $query = Incidencia::where('asignado_a', $user->id)
+                ->with([
+                    'reportante:id,nombre',
+                    'proyecto:id,codigo,nombre'
+                ])
+                ->withCount(['fotos', 'comentarios']);
+
+            if ($request->filled('estado')) {
+                $query->where('estado', $request->estado);
+            }
+
+            if ($request->filled('severidad')) {
+                $query->where('severidad', $request->severidad);
+            }
+
+            $paginado = $query->orderByDesc('created_at')->paginate(10);
+
+            $incidencias = $paginado->getCollection()->map(function (Incidencia $inc): array {
+                $requiereAtencion = $inc->estado === Incidencia::ESTADO_ABIERTA
+                    && Carbon::parse($inc->created_at)->diffInHours(now()) > 4;
+
+                return [
+                    'id'                    => $inc->id,
+                    'codigo'                => $inc->codigo,
+                    'titulo'                => $inc->titulo,
+                    'categoria'             => $inc->categoria,
+                    'severidad'             => $inc->severidad,
+                    'estado'                => $inc->estado,
+                    'ubicacion_descripcion' => $inc->ubicacion_descripcion,
+                    'requiere_atencion'     => $requiereAtencion,
+                    'proyecto'              => $inc->proyecto ? ['codigo' => $inc->proyecto->codigo, 'nombre' => $inc->proyecto->nombre] : null,
+                    'reportante'            => $inc->reportante ? ['nombre' => $inc->reportante->nombre] : null,
+                    'fotos_count'           => $inc->fotos_count,
+                    'comentarios_count'     => $inc->comentarios_count,
+                    'created_at'            => $inc->created_at,
+                    'tiempo_relativo'       => Carbon::parse($inc->created_at)->diffForHumans(),
+                ];
+            });
+
+            $paginado->setCollection($incidencias);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Incidencias asignadas obtenidas correctamente.',
+                'data'    => $paginado,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error al obtener incidencias asignadas.', $e);
         }
     }
 
