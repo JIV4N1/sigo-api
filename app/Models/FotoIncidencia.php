@@ -20,6 +20,11 @@ class FotoIncidencia extends Model
     protected $table = 'fotos_incidencia';
 
     /**
+     * Deshabilitar timestamps automáticos (no hay created_at ni updated_at).
+     */
+    public $timestamps = false;
+
+    /**
      * Campos asignables masivamente.
      *
      * @var list<string>

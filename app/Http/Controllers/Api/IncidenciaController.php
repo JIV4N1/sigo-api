@@ -30,6 +30,90 @@ class IncidenciaController extends Controller
     // =========================================================================
 
     /**
+     * Lista paginada de TODAS las incidencias de la empresa del usuario autenticado.
+     *
+     * @param  Request  $request
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $empresaId = $user->empresa_id;
+
+            if (! $empresaId) {
+                return response()->json(['status' => 'error', 'message' => 'El usuario no tiene una empresa asignada.'], 403);
+            }
+
+            // Filtrar por proyectos que pertenezcan a la empresa del usuario
+            $query = Incidencia::whereHas('proyecto', function ($q) use ($empresaId) {
+                $q->where('empresa_id', $empresaId);
+            })
+            ->with([
+                'proyecto:id,codigo,nombre',
+                'reportante:id,nombre',
+                'asignado:id,nombre',
+            ])
+            ->withCount(['fotos', 'comentarios']);
+
+            // Filtros opcionales
+            if ($request->filled('estado')) {
+                $query->where('estado', $request->estado);
+            }
+            if ($request->filled('severidad')) {
+                $query->where('severidad', $request->severidad);
+            }
+            if ($request->filled('proyecto_id')) {
+                $query->where('proyecto_id', $request->proyecto_id);
+            }
+            if ($request->filled('busqueda')) {
+                $termino = $request->busqueda;
+                $query->where(function ($q) use ($termino): void {
+                    $q->where('titulo', 'ILIKE', "%{$termino}%")
+                      ->orWhere('descripcion', 'ILIKE', "%{$termino}%");
+                });
+            }
+
+            // Ordenar y paginar: 15 por página
+            $paginado = $query->orderByDesc('created_at')->paginate(15);
+
+            // Transformar cada incidencia
+            $incidencias = $paginado->getCollection()->map(function (Incidencia $inc): array {
+                $requiereAtencion = $inc->estado === Incidencia::ESTADO_ABIERTA
+                    && Carbon::parse($inc->created_at)->diffInHours(now()) > 4;
+
+                return [
+                    'id'                    => $inc->id,
+                    'codigo'                => $inc->codigo,
+                    'titulo'                => $inc->titulo,
+                    'categoria'             => $inc->categoria,
+                    'severidad'             => $inc->severidad,
+                    'estado'                => $inc->estado,
+                    'ubicacion_descripcion' => $inc->ubicacion_descripcion,
+                    'requiere_atencion'     => $requiereAtencion,
+                    'proyecto'              => $inc->proyecto ? ['id' => $inc->proyecto->id, 'codigo' => $inc->proyecto->codigo, 'nombre' => $inc->proyecto->nombre] : null,
+                    'reportante'            => $inc->reportante ? ['id' => $inc->reportante->id, 'nombre' => $inc->reportante->nombre] : null,
+                    'asignado'              => $inc->asignado  ? ['id' => $inc->asignado->id, 'nombre' => $inc->asignado->nombre]  : null,
+                    'fotos_count'           => $inc->fotos_count,
+                    'comentarios_count'     => $inc->comentarios_count,
+                    'created_at'            => $inc->created_at,
+                    'tiempo_relativo'       => Carbon::parse($inc->created_at)->diffForHumans(),
+                ];
+            });
+
+            $paginado->setCollection($incidencias);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Incidencias obtenidas correctamente.',
+                'data'    => $paginado,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error al obtener las incidencias.', $e);
+        }
+    }
+
+    /**
      * Lista paginada de incidencias de un proyecto con filtros opcionales.
      *
      * Filtros disponibles (query params):
@@ -41,7 +125,7 @@ class IncidenciaController extends Controller
      * @param  Request  $request
      * @param  int      $proyectoId
      */
-    public function index(Request $request, int $proyectoId): JsonResponse
+    public function porProyecto(Request $request, int $proyectoId): JsonResponse
     {
         try {
             // 1. Verificar que el proyecto existe
@@ -186,12 +270,14 @@ class IncidenciaController extends Controller
                 ]);
 
                 // 6. Cargar relaciones para la respuesta
-                $incidencia->load(['reportante:id,nombre', 'proyecto:id,codigo,nombre']);
+                $incidencia->load(['reportante:id,nombre', 'proyecto:id,codigo,nombre', 'historial']);
 
                 return response()->json([
                     'status'  => 'success',
                     'message' => 'Incidencia creada correctamente.',
-                    'data'    => array_merge($incidencia->toArray(), ['fotos' => $fotosGuardadas]),
+                    'data'    => [
+                        'incidencia' => array_merge($incidencia->toArray(), ['fotos' => $fotosGuardadas])
+                    ],
                 ], 201);
 
             } catch (\Exception $e) {

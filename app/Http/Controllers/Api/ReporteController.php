@@ -220,14 +220,23 @@ class ReporteController extends Controller
                         $foto = FotoReporte::create([
                             'reporte_id'   => $reporte->id,
                             'ruta_imagen'  => $rutaRelativa,
+                            'descripcion'  => $request->input("descripciones.{$indice}"),
+                            'categoria'    => $request->input("categorias.{$indice}"),
                             'es_principal' => $esPrincipal,
+                            'latitud'      => $request->input('latitud'),
+                            'longitud'     => $request->input('longitud'),
                             'tomada_el'    => now(),
                         ]);
 
                         $fotosGuardadas[] = [
-                            'id'          => $foto->id,
-                            'url'         => Storage::disk('public')->url($rutaRelativa),
+                            'id'           => $foto->id,
+                            'url'          => Storage::disk('public')->url($rutaRelativa),
+                            'descripcion'  => $foto->descripcion,
+                            'categoria'    => $foto->categoria,
                             'es_principal' => $foto->es_principal,
+                            'latitud'      => $foto->latitud,
+                            'longitud'     => $foto->longitud,
+                            'tomada_el'    => $foto->tomada_el,
                         ];
                     }
                 }

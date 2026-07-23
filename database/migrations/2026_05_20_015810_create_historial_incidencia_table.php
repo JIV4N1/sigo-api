@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('historial_incidencia', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+            $table->foreignId('incidencia_id')->constrained('incidencias')->onDelete('cascade');
+            $table->foreignId('usuario_id')->constrained('usuarios')->onDelete('cascade');
+            $table->string('accion');
+            $table->text('descripcion');
+            $table->jsonb('metadatos')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
     }
 

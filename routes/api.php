@@ -63,9 +63,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // MÓDULO 4: Incidencias
     // =========================================================================
 
-    /** GET /api/proyectos/{id}/incidencias — Listado paginado con filtros */
-    Route::get('/proyectos/{id}/incidencias', [IncidenciaController::class, 'index'])
+    /** GET /api/incidencias — TODAS las incidencias de la empresa */
+    Route::get('/incidencias', [IncidenciaController::class, 'index'])
          ->name('incidencias.index');
+
+    /** GET /api/proyectos/{id}/incidencias — Listado paginado con filtros */
+    Route::get('/proyectos/{id}/incidencias', [IncidenciaController::class, 'porProyecto'])
+         ->name('proyectos.incidencias');
 
     /** GET /api/incidencias-asignadas — Listado de incidencias asignadas al usuario */
     Route::get('/incidencias-asignadas', [IncidenciaController::class, 'incidenciasAsignadas'])

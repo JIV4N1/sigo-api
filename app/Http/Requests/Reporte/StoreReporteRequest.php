@@ -60,6 +60,14 @@ class StoreReporteRequest extends FormRequest
             // Fotos opcionales: array de imágenes, máximo 5 MB cada una
             'fotos'   => ['nullable', 'array'],
             'fotos.*' => ['image', 'max:5120'], // 5120 KB = 5 MB
+
+            // Metadatos opcionales de las fotos
+            'categorias'      => ['nullable', 'array'],
+            'categorias.*'    => ['nullable', 'string', 'max:100'],
+            'descripciones'   => ['nullable', 'array'],
+            'descripciones.*' => ['nullable', 'string', 'max:255'],
+            'latitud'         => ['nullable', 'numeric', 'between:-90,90'],
+            'longitud'        => ['nullable', 'numeric', 'between:-180,180'],
         ];
     }
 
