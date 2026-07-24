@@ -58,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/reportes', [ReporteController::class, 'store'])->name('reportes.store');
     Route::get('/reportes/{id}', [ReporteController::class, 'show'])->name('reportes.show');
     Route::post('/reportes/{id}/fotos', [ReporteController::class, 'subirFotos'])->name('reportes.fotos');
+    Route::put('/reportes/{id}/validar', [ReporteController::class, 'validar'])->name('reportes.validar');
 
     // =========================================================================
     // MÓDULO 4: Incidencias

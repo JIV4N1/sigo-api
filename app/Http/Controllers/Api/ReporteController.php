@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reporte\StoreReporteRequest;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\FotoReporte;
 use App\Models\Proyecto;
 use App\Models\ReporteDiario;
@@ -23,6 +24,7 @@ use Illuminate\Validation\Rule;
  */
 class ReporteController extends Controller
 {
+    use AdminBypassTrait;
     // =========================================================================
     // INDEX — Listado paginado de reportes de un proyecto
     // =========================================================================
@@ -54,13 +56,8 @@ class ReporteController extends Controller
                 ], 404);
             }
 
-            // 2. Verificar que el usuario tenga acceso al proyecto
-            $tieneAcceso = $request->user()
-                ->proyectos()
-                ->where('proyectos.id', $id)
-                ->exists();
-
-            if (! $tieneAcceso) {
+            // 2. Verificar que el usuario tenga acceso al proyecto (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $id)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes acceso a este proyecto.',
@@ -519,6 +516,83 @@ class ReporteController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error al subir las fotos.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    /**
+     * PUT /api/reportes/{id}/validar
+     *
+     * Permite a un Gerente aprobar o rechazar un reporte diario.
+     * Solo accesible para usuarios con rol 'gerente'.
+     *
+     * Body: { accion: 'aprobar'|'rechazar', notas?: string }
+     *
+     * @param  Request  $request
+     * @param  int      $id  ID del reporte a validar
+     * @return JsonResponse
+     */
+    public function validar(Request $request, int $id): JsonResponse
+    {
+        try {
+            $usuario = $request->user();
+
+            // Verificar que el usuario es gerente
+            $rolNombre = strtolower($usuario->rol->nombre ?? '');
+            if ($rolNombre !== 'gerente') {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo los gerentes pueden validar reportes.',
+                ], 403);
+            }
+
+            $reporte = ReporteDiario::find($id);
+            if (! $reporte) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Reporte no encontrado.',
+                ], 404);
+            }
+
+            $request->validate([
+                'accion' => 'required|in:aprobar,rechazar',
+                'notas'  => 'nullable|string|max:1000',
+            ]);
+
+            $aprobado = $request->accion === 'aprobar';
+
+            $reporte->update([
+                'validado'          => $aprobado,
+                'validado_por'      => $usuario->id,
+                'validado_el'       => now(),
+                'notas_validacion'  => $request->notas ?? null,
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => $aprobado ? 'Reporte aprobado correctamente.' : 'Reporte rechazado.',
+                'data'    => [
+                    'id'               => $reporte->id,
+                    'validado'         => $reporte->validado,
+                    'validado_el'      => $reporte->validado_el,
+                    'notas_validacion' => $reporte->notas_validacion,
+                    'validador'        => [
+                        'id'     => $usuario->id,
+                        'nombre' => $usuario->nombre,
+                    ],
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Datos inválidos.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al validar el reporte.',
                 'errors'  => ['exception' => $e->getMessage()],
             ], 500);
         }

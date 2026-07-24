@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Incidencia\StoreIncidenciaRequest;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\ComentarioIncidencia;
 use App\Models\FotoIncidencia;
 use App\Models\HistorialIncidencia;
@@ -25,6 +26,7 @@ use Illuminate\Validation\Rule;
  */
 class IncidenciaController extends Controller
 {
+    use AdminBypassTrait;
     // =========================================================================
     // INDEX — Listado paginado de incidencias de un proyecto
     // =========================================================================
@@ -134,8 +136,8 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Proyecto no encontrado.'], 404);
             }
 
-            // 2. Verificar que el usuario tiene acceso al proyecto
-            if (! $this->usuarioTieneAcceso($request, $proyectoId)) {
+            // 2. Verificar que el usuario tiene acceso al proyecto (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $proyectoId)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a este proyecto.'], 403);
             }
 
@@ -309,7 +311,8 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Incidencia no encontrada.'], 404);
             }
 
-            if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
+            // Verificar acceso al proyecto de la incidencia (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 
@@ -374,21 +377,23 @@ class IncidenciaController extends Controller
                     in_array($request->estado, $estadosFinales) ? 'required' : 'nullable',
                     'string', 'max:500',
                 ],
+                'asignado_a' => ['nullable', 'integer', 'exists:usuarios,id'],
             ], [
                 'estado.required'     => 'El nuevo estado es obligatorio.',
                 'estado.in'           => 'Estado inválido. Use: abierta, en_progreso, resuelta o cerrada.',
                 'comentario.required' => 'El comentario es obligatorio al resolver o cerrar una incidencia.',
             ]);
 
-            // Verificar que el estado sea diferente al actual
-            if ($incidencia->estado === $request->estado) {
+            // Verificar que el estado sea diferente al actual o se esté asignando un nuevo responsable
+            $esNuevaAsignacion = $request->has('asignado_a') && $incidencia->asignado_a !== $request->asignado_a;
+            if ($incidencia->estado === $request->estado && !$esNuevaAsignacion) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "La incidencia ya se encuentra en estado '{$request->estado}'.",
+                    'message' => "La incidencia ya se encuentra en estado '{$request->estado}' y no hay cambios en el responsable.",
                 ], 422);
             }
 
-            return DB::transaction(function () use ($request, $incidencia, $estadosFinales): JsonResponse {
+            return DB::transaction(function () use ($request, $incidencia, $estadosFinales, $esNuevaAsignacion): JsonResponse {
                 $estadoAnterior = $incidencia->estado;
 
                 // Actualizar el estado y la fecha de resolución si aplica
@@ -396,18 +401,33 @@ class IncidenciaController extends Controller
                 if ($request->estado === Incidencia::ESTADO_RESUELTA) {
                     $incidencia->resuelta_el = now();
                 }
+
+                // Asignar responsable si viene en la petición y es admin/gerente
+                $asignadoNuevo = false;
+                if ($request->has('asignado_a') && $request->user()->tieneRol(['gerente', 'administrador'])) {
+                    $incidencia->asignado_a = $request->asignado_a;
+                    $asignadoNuevo = true;
+                }
+
                 $incidencia->save();
+
+                $desc = "{$request->user()->nombre} cambió el estado de {$estadoAnterior} a {$request->estado}";
+                if ($asignadoNuevo) {
+                    $nombreAsignado = \App\Models\Usuario::find($request->asignado_a)?->nombre ?? 'un responsable';
+                    $desc .= " y asignó a {$nombreAsignado}";
+                }
 
                 // Registrar en historial
                 HistorialIncidencia::create([
                     'incidencia_id' => $incidencia->id,
                     'usuario_id'    => $request->user()->id,
                     'accion'        => HistorialIncidencia::ACCION_CAMBIO_ESTADO,
-                    'descripcion'   => "{$request->user()->nombre} cambió el estado de {$estadoAnterior} a {$request->estado}",
+                    'descripcion'   => $desc,
                     'metadatos'     => [
                         'estado_anterior' => $estadoAnterior,
                         'estado_nuevo'    => $request->estado,
                         'comentario'      => $request->comentario,
+                        'asignado_a'      => $request->asignado_a,
                     ],
                 ]);
 
@@ -422,7 +442,7 @@ class IncidenciaController extends Controller
 
                 return response()->json([
                     'status'  => 'success',
-                    'message' => "Estado actualizado a '{$request->estado}' correctamente.",
+                    'message' => "Estado actualizado correctamente.",
                     'data'    => $incidencia->fresh(['reportante:id,nombre', 'asignado:id,nombre']),
                 ]);
             });
@@ -723,19 +743,9 @@ class IncidenciaController extends Controller
         return sprintf('INC-%03d', $numero + 1);
     }
 
-    /**
-     * Verifica si el usuario autenticado está asignado al proyecto indicado.
-     *
-     * @param  Request  $request
-     * @param  int      $proyectoId
-     */
-    private function usuarioTieneAcceso(Request $request, int $proyectoId): bool
-    {
-        return $request->user()
-            ->proyectos()
-            ->where('proyectos.id', $proyectoId)
-            ->exists();
-    }
+    // Nota: la verificación de acceso a proyectos se gestiona mediante
+    // AdminBypassTrait::tieneAccesoAProyecto(), que otorga bypass automático
+    // a los roles 'administrador' y 'gerente'.
 
     /**
      * Genera una respuesta JSON de error estándar SIGO (500).

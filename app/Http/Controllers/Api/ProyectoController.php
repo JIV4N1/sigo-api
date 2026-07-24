@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Incidencia;
 use App\Models\Proyecto;
 use App\Models\ReporteDiario;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProyectoController extends Controller
 {
+    use AdminBypassTrait;
     // =========================================================================
     // INDEX — Listar proyectos con filtros
     // =========================================================================
@@ -246,15 +248,8 @@ class ProyectoController extends Controller
                 ], 404);
             }
 
-            // Verificar acceso
-            $user = $request->user();
-            if ($user->tieneRol(['gerente', 'administrador'])) {
-                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
-            } else {
-                $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
-            }
-
-            if (! $tieneAcceso) {
+            // Verificar acceso al proyecto (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $id)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes acceso a este proyecto.',
@@ -268,7 +263,7 @@ class ProyectoController extends Controller
             ]);
 
             // Determinar mi_rol para el detalle del proyecto
-            $pivot = $proyecto->usuariosActivos()->where('usuarios.id', $user->id)->first()?->pivot;
+            $pivot = $proyecto->usuariosActivos()->where('usuarios.id', $request->user()->id)->first()?->pivot;
             $proyecto->mi_rol = $pivot->rol_en_proyecto ?? null;
 
             return response()->json([
@@ -726,15 +721,8 @@ class ProyectoController extends Controller
                 ], 404);
             }
 
-            // Verificar acceso
-            $user = $request->user();
-            if ($user->tieneRol(['gerente', 'administrador'])) {
-                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
-            } else {
-                $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
-            }
-
-            if (! $tieneAcceso) {
+            // Verificar acceso al proyecto (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $id)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'No tienes acceso a este proyecto.',
