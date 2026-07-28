@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Cotizacion;
 use App\Models\Material;
 use App\Models\MovimientoInventario;
@@ -13,12 +14,14 @@ use Illuminate\Support\Facades\DB;
 
 class CotizacionController extends Controller
 {
+    use AdminBypassTrait;
+
     /**
      * GET /api/cotizaciones
      */
     public function index(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         $cotizaciones = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,name as nombre'])
             ->where('empresa_id', $empresaId)
@@ -60,7 +63,7 @@ class CotizacionController extends Controller
      */
     public function search(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
         $busqueda = $request->query('busqueda');
 
         $query = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,name as nombre'])
@@ -112,7 +115,7 @@ class CotizacionController extends Controller
      */
     public function generarFolio(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         // Obtener el último ID o último folio de la empresa para generar el siguiente
         $ultimoId = Cotizacion::max('id') ?? 0;
@@ -149,7 +152,7 @@ class CotizacionController extends Controller
         ]);
 
         $user = $request->user();
-        $empresaId = $user->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         try {
             $cotizacionResult = DB::transaction(function () use ($validated, $user, $empresaId, $request) {
@@ -233,7 +236,7 @@ class CotizacionController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
         $cotizacion = Cotizacion::with(['cliente', 'partidas.material'])->find($id);
 
         if (!$cotizacion || $cotizacion->empresa_id !== $empresaId) {
@@ -281,7 +284,7 @@ class CotizacionController extends Controller
      */
     public function convertirAVenta(Request $request, $id)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
         $user = $request->user();
 
         $cotizacion = Cotizacion::with('partidas')->find($id);
@@ -395,7 +398,7 @@ class CotizacionController extends Controller
     public function datosPdf(Request $request, $id)
     {
         try {
-            $empresaId = $request->user()->empresa_id;
+            $empresaId = $this->getEmpresaId($request);
             
             // Usando Modelos de Empresa si existe, si no, se devuelve lo básico
             $cotizacion = Cotizacion::with(['cliente', 'partidas.material'])->find($id);

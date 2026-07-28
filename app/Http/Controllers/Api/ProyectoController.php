@@ -32,7 +32,7 @@ class ProyectoController extends Controller
     {
         try {
             $user = $request->user();
-            $empresaId = $user->empresa_id;
+            $empresaId = $this->getEmpresaId($request);
 
             // Gerentes y administradores ven todos los proyectos de su empresa.
             // Supervisores e ingenieros solo ven proyectos asignados activamente.
@@ -170,7 +170,7 @@ class ProyectoController extends Controller
                     'avance'         => $request->avance ?? 0,
                     'estado'         => $request->estado ?? 'planeado',
                     'cliente_id'     => $request->cliente_id,
-                    'empresa_id'     => $request->user()->empresa_id,
+                    'empresa_id'     => $this->getEmpresaId($request),
                     'imagen_portada' => $imagenPortadaPath,
                     'creado_por'     => $request->user()->id,
                 ]);
@@ -322,7 +322,7 @@ class ProyectoController extends Controller
         try {
             $proyecto = Proyecto::find($id);
 
-            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Proyecto no encontrado.',
@@ -420,7 +420,7 @@ class ProyectoController extends Controller
         try {
             $proyecto = Proyecto::find($id);
 
-            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Proyecto no encontrado.',
@@ -458,7 +458,7 @@ class ProyectoController extends Controller
         try {
             $proyecto = Proyecto::find($id);
 
-            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Proyecto no encontrado.',
@@ -534,7 +534,7 @@ class ProyectoController extends Controller
         try {
             $proyecto = Proyecto::find($id);
 
-            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Proyecto no encontrado.',
@@ -579,7 +579,7 @@ class ProyectoController extends Controller
         try {
             $proyecto = Proyecto::find($id);
 
-            if (! $proyecto || $proyecto->empresa_id !== $request->user()->empresa_id) {
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Proyecto no encontrado.',
@@ -590,7 +590,7 @@ class ProyectoController extends Controller
             $asignadosIds = $proyecto->usuariosActivos()->pluck('usuarios.id')->toArray();
 
             // Filtrar usuarios de la misma empresa, activos, que no estén asignados
-            $query = Usuario::where('empresa_id', $request->user()->empresa_id)
+            $query = Usuario::where('empresa_id', $this->getEmpresaId($request))
                 ->where('activo', true)
                 ->whereNotIn('id', $asignadosIds)
                 ->with('rol');
@@ -651,7 +651,7 @@ class ProyectoController extends Controller
             // Verificar acceso
             $user = $request->user();
             if ($user->tieneRol(['gerente', 'administrador'])) {
-                $tieneAcceso = $proyecto->empresa_id === $user->empresa_id;
+                $tieneAcceso = $proyecto->empresa_id === $this->getEmpresaId($request);
             } else {
                 $tieneAcceso = $user->proyectosActivos()->where('proyectos.id', $id)->exists();
             }

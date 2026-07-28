@@ -9,6 +9,10 @@ use App\Http\Controllers\Api\ProveedorController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\AsistenciaController;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\Api\HorarioController;
+use App\Http\Controllers\Api\DiaNoLaboralController;
+use App\Http\Controllers\Api\ReporteHorasController;
+use App\Http\Controllers\Api\ControlHorarioController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -21,6 +25,7 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/me', [AuthController::class, 'me'])->name('me');
+        Route::put('/cambiar-empresa', [AuthController::class, 'cambiarEmpresa'])->name('cambiar-empresa');
     });
 });
 
@@ -33,7 +38,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // =========================================================================
     // MÓDULO: Usuarios
     // =========================================================================
-    Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::prefix('usuarios')->name('usuarios.')->group(function () {
+        Route::get('/', [UsuarioController::class, 'index'])->name('index');
+        Route::post('/', [UsuarioController::class, 'store'])->name('store');
+        Route::get('/{id}', [UsuarioController::class, 'show'])->name('show');
+        Route::put('/{id}', [UsuarioController::class, 'update'])->name('update');
+        Route::delete('/{id}', [UsuarioController::class, 'destroy'])->name('destroy');
+    });
 
     // =========================================================================
     // MÓDULO 2: Proyectos
@@ -111,6 +122,34 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/salida', [AsistenciaController::class, 'registrarSalida'])->name('salida');
         Route::get('/historial', [AsistenciaController::class, 'historial'])->name('historial');
     });
+
+    // =========================================================================
+    // MÓDULO: Horarios laborales
+    // =========================================================================
+    Route::prefix('horarios')->name('horarios.')->group(function () {
+        Route::get('/', [HorarioController::class, 'index'])->name('index');
+        Route::post('/', [HorarioController::class, 'store'])->name('store');
+        Route::put('/{id}', [HorarioController::class, 'update'])->name('update');
+    });
+
+    // =========================================================================
+    // MÓDULO: Días no laborales
+    // =========================================================================
+    Route::prefix('dias-no-laborales')->name('dias-no-laborales.')->group(function () {
+        Route::get('/', [DiaNoLaboralController::class, 'index'])->name('index');
+        Route::post('/', [DiaNoLaboralController::class, 'store'])->name('store');
+        Route::delete('/{id}', [DiaNoLaboralController::class, 'destroy'])->name('destroy');
+    });
+
+    // =========================================================================
+    // MÓDULO: Reporte de horas
+    // =========================================================================
+    Route::get('/reporte-horas', [ReporteHorasController::class, 'index'])->name('reporte-horas.index');
+
+    // =========================================================================
+    // MÓDULO: Control horario
+    // =========================================================================
+    Route::get('/control-horario', [ControlHorarioController::class, 'index'])->name('control-horario.index');
 
     // =========================================================================
     // MÓDULO 5: Clientes

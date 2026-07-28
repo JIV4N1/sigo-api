@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Cliente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,8 @@ use Illuminate\Http\Request;
  */
 class ClienteController extends Controller
 {
+    use AdminBypassTrait;
+
     // =========================================================================
     // Métodos privados de apoyo
     // =========================================================================
@@ -109,7 +112,7 @@ class ClienteController extends Controller
      */
     private function obtenerEmpresaId(Request $request, ?int &$empresaId): ?JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (! $empresaId) {
             return response()->json([

@@ -39,8 +39,7 @@ class IncidenciaController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $user = $request->user();
-            $empresaId = $user->empresa_id;
+            $empresaId = $this->getEmpresaId($request);
 
             if (! $empresaId) {
                 return response()->json(['status' => 'error', 'message' => 'El usuario no tiene una empresa asignada.'], 403);
@@ -220,7 +219,7 @@ class IncidenciaController extends Controller
         return DB::transaction(function () use ($request): JsonResponse {
             try {
                 // 1. Verificar acceso al proyecto
-                if (! $this->usuarioTieneAcceso($request, $request->proyecto_id)) {
+                if (! $this->tieneAccesoAProyecto($request, $request->proyecto_id)) {
                     return response()->json(['status' => 'error', 'message' => 'No tienes acceso a este proyecto.'], 403);
                 }
 
@@ -352,7 +351,7 @@ class IncidenciaController extends Controller
 
             $user = $request->user();
 
-            if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
+            if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 
@@ -470,7 +469,7 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Incidencia no encontrada.'], 404);
             }
 
-            if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
+            if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 
@@ -559,7 +558,7 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Incidencia no encontrada.'], 404);
             }
 
-            if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
+            if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 
@@ -601,7 +600,7 @@ class IncidenciaController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Incidencia no encontrada.'], 404);
             }
 
-            if (! $this->usuarioTieneAcceso($request, $incidencia->proyecto_id)) {
+            if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 

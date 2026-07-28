@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Proveedor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Illuminate\Http\Request;
  */
 class ProveedorController extends Controller
 {
+    use AdminBypassTrait;
+
     // =========================================================================
     // Métodos privados de apoyo
     // =========================================================================
@@ -61,7 +64,7 @@ class ProveedorController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (!$empresaId) {
             return response()->json([
@@ -88,7 +91,7 @@ class ProveedorController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (!$empresaId) {
             return response()->json([
@@ -126,7 +129,7 @@ class ProveedorController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (!$empresaId) {
             return response()->json([
@@ -182,7 +185,7 @@ class ProveedorController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (!$empresaId) {
             return response()->json([
@@ -240,7 +243,7 @@ class ProveedorController extends Controller
      */
     public function desactivar(Request $request, int $id): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         if (!$empresaId) {
             return response()->json([

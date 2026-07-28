@@ -36,9 +36,10 @@ class Usuario extends Authenticatable
         'password',
         'telefono',
         'foto_perfil',
-        'role_id',
+        'rol_id',
         'activo',
         'ultimo_acceso',
+        'empresa_activa_id',
     ];
 
     /**
@@ -156,6 +157,14 @@ class Usuario extends Authenticatable
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class, 'empresa_id');
+    }
+
+    /**
+     * Relación: empresa actualmente seleccionada por un administrador multi-empresa.
+     */
+    public function empresaActiva(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class, 'empresa_activa_id');
     }
 
     /**

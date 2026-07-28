@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Material;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Illuminate\Http\Request;
  */
 class MaterialController extends Controller
 {
+    use AdminBypassTrait;
+
     // =========================================================================
     // Métodos privados de apoyo
     // =========================================================================
@@ -76,7 +79,7 @@ class MaterialController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         $materiales = $this->queryBase($empresaId)->get();
 
@@ -101,7 +104,7 @@ class MaterialController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $empresaId   = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
         $busqueda    = $request->query('busqueda');
         $proveedorId = $request->query('proveedor_id');
 
@@ -177,7 +180,7 @@ class MaterialController extends Controller
         // Crear el material asignando empresa y estado activo
         $material = Material::create([
             ...$validated,
-            'empresa_id' => $request->user()->empresa_id,
+            'empresa_id' => $this->getEmpresaId($request),
             'activo'     => true,
         ]);
 
@@ -205,7 +208,7 @@ class MaterialController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         // Verificar que el material existe y pertenece a la empresa del usuario
         $material = Material::where('id', $empresaId === null ? $id : $id)
@@ -276,7 +279,7 @@ class MaterialController extends Controller
      */
     public function desactivar(Request $request, int $id): JsonResponse
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         // Verificar que el material existe y pertenece a la empresa del usuario
         $material = Material::where('id', $id)

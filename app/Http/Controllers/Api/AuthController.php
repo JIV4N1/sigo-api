@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\CambiarEmpresaRequest;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Traits\AdminBypassTrait;
+use App\Models\Empresa;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,11 +15,14 @@ use Illuminate\Support\Facades\Hash;
 /**
  * Controlador de autenticación del sistema SIGO.
  *
- * Gestiona el inicio de sesión, cierre de sesión y la obtención
- * del perfil del usuario autenticado mediante tokens de Sanctum.
+ * Gestiona el inicio de sesión, cierre de sesión, la obtención
+ * del perfil del usuario autenticado y el cambio de empresa activa
+ * (para administradores multi-empresa) mediante tokens de Sanctum.
  */
 class AuthController extends Controller
 {
+    use AdminBypassTrait;
+
     // =========================================================================
     // LOGIN
     // =========================================================================
@@ -137,6 +143,7 @@ class AuthController extends Controller
      * Incluye:
      * - Datos personales: id, nombre, email, teléfono, foto de perfil.
      * - Rol asignado: id y nombre.
+     * - Empresa activa y, si es administrador, las empresas disponibles para cambiar.
      * - Proyectos asignados: id, código, nombre, ubicación, avance y estado.
      *
      * @param  Request  $request  Petición autenticada con Sanctum.
@@ -149,32 +156,48 @@ class AuthController extends Controller
             /** @var Usuario $usuario */
             $usuario = $request->user()->load(['rol', 'proyectos']);
 
+            $empresaActualId = $this->getEmpresaId($request);
+            $empresaActual = $empresaActualId ? Empresa::find($empresaActualId, ['id', 'nombre']) : null;
+
+            $datos = [
+                'id'          => $usuario->id,
+                'nombre'      => $usuario->nombre,
+                'email'       => $usuario->email,
+                'telefono'    => $usuario->telefono,
+                'foto_perfil' => $usuario->foto_perfil,
+
+                // Rol del usuario (puede ser null si no tiene rol asignado)
+                'rol' => $usuario->rol ? [
+                    'id'     => $usuario->rol->id,
+                    'nombre' => $usuario->rol->nombre,
+                ] : null,
+
+                // Empresa actualmente seleccionada (empresa_activa_id o empresa_id fija)
+                'empresa_actual' => $empresaActual ? [
+                    'id'     => $empresaActual->id,
+                    'nombre' => $empresaActual->nombre,
+                ] : null,
+
+                // Proyectos asignados al usuario
+                'proyectos' => $usuario->proyectos->map(fn ($proyecto) => [
+                    'id'        => $proyecto->id,
+                    'codigo'    => $proyecto->codigo,
+                    'nombre'    => $proyecto->nombre,
+                    'ubicacion' => $proyecto->ubicacion,
+                    'avance'    => $proyecto->avance,
+                    'estado'    => $proyecto->estado,
+                ])->values(),
+            ];
+
+            // Empresas disponibles solo se incluye para administradores multi-empresa
+            if ($usuario->tieneRol(['administrador'])) {
+                $datos['empresas_disponibles'] = $this->empresasDisponibles($usuario);
+            }
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Perfil obtenido correctamente.',
-                'data'    => [
-                    'id'          => $usuario->id,
-                    'nombre'      => $usuario->nombre,
-                    'email'       => $usuario->email,
-                    'telefono'    => $usuario->telefono,
-                    'foto_perfil' => $usuario->foto_perfil,
-
-                    // Rol del usuario (puede ser null si no tiene rol asignado)
-                    'rol' => $usuario->rol ? [
-                        'id'     => $usuario->rol->id,
-                        'nombre' => $usuario->rol->nombre,
-                    ] : null,
-
-                    // Proyectos asignados al usuario
-                    'proyectos' => $usuario->proyectos->map(fn ($proyecto) => [
-                        'id'        => $proyecto->id,
-                        'codigo'    => $proyecto->codigo,
-                        'nombre'    => $proyecto->nombre,
-                        'ubicacion' => $proyecto->ubicacion,
-                        'avance'    => $proyecto->avance,
-                        'estado'    => $proyecto->estado,
-                    ])->values(),
-                ],
+                'data'    => $datos,
             ], 200);
 
         } catch (\Exception $e) {
@@ -184,5 +207,88 @@ class AuthController extends Controller
                 'errors'  => ['exception' => $e->getMessage()],
             ], 500);
         }
+    }
+
+    // =========================================================================
+    // CAMBIAR EMPRESA (ADMINISTRADORES MULTI-EMPRESA)
+    // =========================================================================
+
+    /**
+     * Cambia la empresa activa del usuario autenticado.
+     *
+     * - Administradores pueden cambiar a cualquier empresa a la que tengan
+     *   acceso (su empresa_id fija, si la tiene, o cualquiera registrada en
+     *   la tabla pivote empresa_usuario).
+     * - El resto de los roles solo pueden "cambiar" a su propia empresa_id.
+     *
+     * @param  CambiarEmpresaRequest  $request  Petición ya validada (empresa_id).
+     * @return JsonResponse
+     */
+    public function cambiarEmpresa(CambiarEmpresaRequest $request): JsonResponse
+    {
+        try {
+            /** @var Usuario $usuario */
+            $usuario = $request->user();
+            $empresaId = (int) $request->empresa_id;
+
+            $tieneAcceso = $usuario->tieneRol(['administrador'])
+                ? $empresaId === $usuario->empresa_id || $usuario->empresas()->where('empresas.id', $empresaId)->exists()
+                : $empresaId === $usuario->empresa_id;
+
+            if (! $tieneAcceso) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes acceso a esa empresa.',
+                ], 403);
+            }
+
+            $usuario->update(['empresa_activa_id' => $empresaId]);
+
+            $empresa = Empresa::find($empresaId);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Empresa cambiada correctamente',
+                'data'    => [
+                    'empresa' => [
+                        'id'           => $empresa->id,
+                        'nombre'       => $empresa->nombre,
+                        'razon_social' => $empresa->razon_social,
+                        'rfc'          => $empresa->rfc,
+                    ],
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al cambiar de empresa.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    /**
+     * Lista de empresas a las que un administrador tiene acceso:
+     * su empresa_id fija (si la tiene) más las registradas en empresa_usuario.
+     *
+     * @return array<int, array{id: int, nombre: string}>
+     */
+    private function empresasDisponibles(Usuario $usuario): array
+    {
+        $empresas = collect();
+
+        if ($usuario->empresa_id) {
+            $propia = Empresa::find($usuario->empresa_id, ['id', 'nombre']);
+            if ($propia) {
+                $empresas->push($propia);
+            }
+        }
+
+        $empresas = $empresas->merge($usuario->empresas()->get(['empresas.id', 'empresas.nombre']))
+            ->unique('id')
+            ->values();
+
+        return $empresas->map(fn (Empresa $e) => ['id' => $e->id, 'nombre' => $e->nombre])->all();
     }
 }

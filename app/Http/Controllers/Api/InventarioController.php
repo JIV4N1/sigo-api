@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\AdminBypassTrait;
 use App\Models\Material;
 use App\Models\MovimientoInventario;
 use Illuminate\Http\Request;
@@ -10,12 +11,14 @@ use Illuminate\Support\Facades\DB;
 
 class InventarioController extends Controller
 {
+    use AdminBypassTrait;
+
     /**
      * GET /api/inventario
      */
     public function index(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         $materiales = Material::with('proveedor:id,nombre')
             ->where('empresa_id', $empresaId)
@@ -58,7 +61,7 @@ class InventarioController extends Controller
      */
     public function bajoStock(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
 
         $materiales = Material::where('empresa_id', $empresaId)
             ->where('activo', true)
@@ -94,7 +97,7 @@ class InventarioController extends Controller
      */
     public function historial(Request $request)
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $this->getEmpresaId($request);
         $materialId = $request->query('material_id');
 
         $query = MovimientoInventario::with(['material', 'usuario'])
@@ -147,7 +150,7 @@ class InventarioController extends Controller
         $user = $request->user();
         $material = Material::findOrFail($validated['material_id']);
 
-        if ($material->empresa_id !== $user->empresa_id) {
+        if ($material->empresa_id !== $this->getEmpresaId($request)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Acceso denegado a este material'

@@ -12,6 +12,7 @@ class Asistencia extends Model
     protected $fillable = [
         'usuario_id',
         'proyecto_id',
+        'empresa_id',
         'fecha',
         'entrada',
         'comida_inicio',
@@ -44,5 +45,24 @@ class Asistencia extends Model
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    /**
+     * Horas trabajadas del registro (entrada-salida, descontando comida).
+     * Retorna 0 si el registro está incompleto (sin entrada o sin salida).
+     */
+    public function horasTrabajadas(): float
+    {
+        if (! $this->entrada || ! $this->salida) {
+            return 0.0;
+        }
+
+        $minutos = $this->entrada->diffInMinutes($this->salida);
+
+        if ($this->comida_inicio && $this->comida_fin) {
+            $minutos -= $this->comida_inicio->diffInMinutes($this->comida_fin);
+        }
+
+        return round(max(0, $minutos) / 60, 2);
     }
 }
