@@ -23,7 +23,7 @@ class StoreHorarioRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'dia_semana'  => 'required|integer|between:1,7',
+            'dia_semana'  => 'required|numeric|between:1,7',
             'hora_inicio' => 'required_if:es_laboral,true|nullable|date_format:H:i',
             'hora_fin'    => 'required_if:es_laboral,true|nullable|date_format:H:i|after:hora_inicio',
             'es_laboral'  => 'sometimes|boolean',
@@ -37,6 +37,7 @@ class StoreHorarioRequest extends FormRequest
     {
         return [
             'dia_semana.required'    => 'El día de la semana es obligatorio.',
+            'dia_semana.numeric'     => 'El día de la semana debe ser un número entero (1-7).',
             'dia_semana.between'     => 'El día de la semana debe ser un número entre 1 (lunes) y 7 (domingo).',
             'hora_inicio.required_if' => 'La hora de inicio es obligatoria para un día laboral.',
             'hora_inicio.date_format' => 'La hora de inicio debe tener el formato HH:MM.',

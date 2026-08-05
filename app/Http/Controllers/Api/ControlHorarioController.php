@@ -120,6 +120,8 @@ class ControlHorarioController extends Controller
                         ] : null,
                         'fecha'            => $fechaStr,
                         'entrada'          => $registro?->entrada?->format('H:i'),
+                        'comida_inicio'    => $registro?->comida_inicio?->format('H:i'),
+                        'comida_fin'       => $registro?->comida_fin?->format('H:i'),
                         'salida'           => $registro?->salida?->format('H:i'),
                         'horas_trabajadas' => $registro ? $registro->horasTrabajadas() : 0.0,
                         'estado'           => $estado,

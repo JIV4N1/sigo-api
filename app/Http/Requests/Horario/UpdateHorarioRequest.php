@@ -23,7 +23,7 @@ class UpdateHorarioRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'dia_semana'  => 'sometimes|required|integer|between:1,7',
+            'dia_semana'  => 'sometimes|required|numeric|between:1,7',
             'hora_inicio' => 'sometimes|nullable|date_format:H:i',
             'hora_fin'    => 'sometimes|nullable|date_format:H:i|after:hora_inicio',
             'es_laboral'  => 'sometimes|boolean',
@@ -36,6 +36,7 @@ class UpdateHorarioRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'dia_semana.numeric'      => 'El día de la semana debe ser un número entero (1-7).',
             'dia_semana.between'      => 'El día de la semana debe ser un número entre 1 (lunes) y 7 (domingo).',
             'hora_inicio.date_format' => 'La hora de inicio debe tener el formato HH:MM.',
             'hora_fin.date_format'    => 'La hora de fin debe tener el formato HH:MM.',

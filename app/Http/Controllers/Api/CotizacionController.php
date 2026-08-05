@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cotizacion\StoreCotizacionRequest;
 use App\Http\Traits\AdminBypassTrait;
 use App\Models\Cotizacion;
 use App\Models\Material;
@@ -23,7 +24,7 @@ class CotizacionController extends Controller
     {
         $empresaId = $this->getEmpresaId($request);
 
-        $cotizaciones = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,name as nombre'])
+        $cotizaciones = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,nombre'])
             ->where('empresa_id', $empresaId)
             ->orderBy('created_at', 'desc')
             ->get([
@@ -66,7 +67,7 @@ class CotizacionController extends Controller
         $empresaId = $this->getEmpresaId($request);
         $busqueda = $request->query('busqueda');
 
-        $query = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,name as nombre'])
+        $query = Cotizacion::with(['cliente:id,razon_social', 'usuario:id,nombre'])
             ->where('empresa_id', $empresaId);
 
         if ($busqueda) {
@@ -134,22 +135,9 @@ class CotizacionController extends Controller
     /**
      * POST /api/cotizaciones
      */
-    public function store(Request $request)
+    public function store(StoreCotizacionRequest $request)
     {
-        $validated = $request->validate([
-            'cliente_id' => 'required|exists:clientes,id',
-            'fecha' => 'required|date',
-            'subtotal' => 'required|numeric|min:0',
-            'iva' => 'required|numeric|min:0',
-            'total' => 'required|numeric|min:0',
-            'estado' => 'required|in:Pendiente,Aprobada,Rechazada,ConvertidaAVenta',
-            'observaciones' => 'nullable|string',
-            'detalles' => 'required|array|min:1',
-            'detalles.*.material_id' => 'required|exists:materiales,id',
-            'detalles.*.cantidad' => 'required|numeric|min:0.01',
-            'detalles.*.precio_unitario' => 'required|numeric|min:0',
-            'detalles.*.subtotal' => 'required|numeric|min:0',
-        ]);
+        $validated = $request->validated();
 
         $user = $request->user();
         $empresaId = $this->getEmpresaId($request);
@@ -296,10 +284,10 @@ class CotizacionController extends Controller
             ], 403);
         }
 
-        if ($cotizacion->estado === 'ConvertidaAVenta') {
+        if (! in_array($cotizacion->estado, ['Pendiente', 'Aprobada'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'La cotización ya fue convertida a venta'
+                'message' => 'Solo se pueden convertir cotizaciones en estado Pendiente o Aprobada.'
             ], 422);
         }
 
@@ -316,10 +304,8 @@ class CotizacionController extends Controller
 
         try {
             $venta = DB::transaction(function () use ($cotizacion, $user, $empresaId) {
-                // Generar folio de venta basado en el último
-                $ultimoIdVenta = Venta::max('id') ?? 0;
-                $siguienteIdVenta = $ultimoIdVenta + 1;
-                $folioVenta = 'VENTA-' . str_pad($siguienteIdVenta, 3, '0', STR_PAD_LEFT);
+                // Generar folio de venta (formato VEN-000001, igual que VentaController::store)
+                $folioVenta = 'VEN-' . str_pad(Venta::count() + 1, 6, '0', STR_PAD_LEFT);
 
                 // Crear Venta
                 $venta = Venta::create([

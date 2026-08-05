@@ -13,6 +13,9 @@ use App\Http\Controllers\Api\HorarioController;
 use App\Http\Controllers\Api\DiaNoLaboralController;
 use App\Http\Controllers\Api\ReporteHorasController;
 use App\Http\Controllers\Api\ControlHorarioController;
+use App\Http\Controllers\Api\EmpresaController;
+use App\Http\Controllers\Api\VentaController;
+use App\Http\Controllers\Api\ReporteVentasController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -34,6 +37,18 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 // =============================================================================
 
 Route::middleware('auth:sanctum')->group(function (): void {
+
+    // =========================================================================
+    // MÓDULO: Empresas
+    // =========================================================================
+    Route::post('/empresas', [EmpresaController::class, 'store'])->name('empresas.store');
+
+    // Configuración de la empresa activa del usuario (respaldada por la tabla `empresas`)
+    Route::prefix('empresa')->name('empresa.')->group(function () {
+        Route::get('/configuracion', [EmpresaController::class, 'configuracion'])->name('configuracion.show');
+        Route::put('/configuracion', [EmpresaController::class, 'actualizarConfiguracion'])->name('configuracion.update');
+        Route::post('/logo', [EmpresaController::class, 'subirLogo'])->name('logo');
+    });
 
     // =========================================================================
     // MÓDULO: Usuarios
@@ -63,11 +78,31 @@ Route::middleware('auth:sanctum')->group(function (): void {
     });
 
     // =========================================================================
+    // MÓDULO: Reportes de Ventas (analítica) — declarado ANTES de "Reportes
+    // Diarios" a propósito: sus rutas son segmentos literales bajo /reportes/*
+    // y deben resolverse antes que el wildcard GET /reportes/{id} de abajo,
+    // o Laravel lo capturaría como si "ventas-por-dia" fuera un {id}.
+    // =========================================================================
+    Route::prefix('reportes')->name('reportes-ventas.')->group(function () {
+        Route::get('/ventas-por-dia', [ReporteVentasController::class, 'ventasPorDia'])->name('ventas-por-dia');
+        Route::get('/ventas-por-mes', [ReporteVentasController::class, 'ventasPorMes'])->name('ventas-por-mes');
+        Route::get('/materiales-mas-vendidos', [ReporteVentasController::class, 'materialesMasVendidos'])->name('materiales-mas-vendidos');
+        Route::get('/clientes-frecuentes', [ReporteVentasController::class, 'clientesFrecuentes'])->name('clientes-frecuentes');
+        Route::get('/inventario-actual', [ReporteVentasController::class, 'inventarioActual'])->name('inventario-actual');
+        Route::get('/materiales-bajo-stock', [ReporteVentasController::class, 'materialesBajoStock'])->name('materiales-bajo-stock');
+    });
+
+    // =========================================================================
     // MÓDULO 3: Reportes Diarios
     // =========================================================================
     Route::get('/proyectos/{id}/reportes', [ReporteController::class, 'index'])->name('reportes.index');
     Route::post('/reportes', [ReporteController::class, 'store'])->name('reportes.store');
     Route::get('/reportes/{id}', [ReporteController::class, 'show'])->name('reportes.show');
+
+    // Alias esperado por el frontend web (app/(dashboard)/reportes-diarios/[id]/page.tsx
+    // llama a /api/reportes-diarios/{id}, que no existía; apunta al mismo show()).
+    Route::get('/reportes-diarios/{id}', [ReporteController::class, 'show'])->name('reportes-diarios.show');
+
     Route::post('/reportes/{id}/fotos', [ReporteController::class, 'subirFotos'])->name('reportes.fotos');
     Route::put('/reportes/{id}/validar', [ReporteController::class, 'validar'])->name('reportes.validar');
 
@@ -163,6 +198,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/clientes/search', [ClienteController::class, 'search'])
          ->name('clientes.search');
 
+    /** GET /api/clientes/{id} — Detalle de un cliente */
+    Route::get('/clientes/{id}', [ClienteController::class, 'show'])
+         ->name('clientes.show');
+
     /** POST /api/clientes — Crear nuevo cliente */
     Route::post('/clientes', [ClienteController::class, 'store'])
          ->name('clientes.store');
@@ -187,6 +226,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/proveedores/search', [ProveedorController::class, 'search'])
          ->name('proveedores.search');
 
+    /** GET /api/proveedores/{id} — Detalle de un proveedor */
+    Route::get('/proveedores/{id}', [ProveedorController::class, 'show'])
+         ->name('proveedores.show');
+
     /** POST /api/proveedores — Crear nuevo proveedor */
     Route::post('/proveedores', [ProveedorController::class, 'store'])
          ->name('proveedores.store');
@@ -210,6 +253,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     /** GET /api/materiales/search — Búsqueda por texto y/o proveedor */
     Route::get('/materiales/search', [MaterialController::class, 'search'])
          ->name('materiales.search');
+
+    /** GET /api/materiales/{id} — Detalle de un material */
+    Route::get('/materiales/{id}', [MaterialController::class, 'show'])
+         ->name('materiales.show');
 
     /** POST /api/materiales — Crear nuevo material */
     Route::post('/materiales', [MaterialController::class, 'store'])
@@ -244,6 +291,17 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{id}', [App\Http\Controllers\Api\CotizacionController::class, 'show'])->name('show');
         Route::post('/{id}/convertir-venta', [App\Http\Controllers\Api\CotizacionController::class, 'convertirAVenta'])->name('convertir-venta');
         Route::get('/{id}/pdf', [App\Http\Controllers\Api\CotizacionController::class, 'datosPdf'])->name('pdf');
+    });
+
+    // =========================================================================
+    // MÓDULO 11: Ventas
+    // =========================================================================
+    Route::prefix('ventas')->name('ventas.')->group(function () {
+        Route::get('/', [VentaController::class, 'index'])->name('index');
+        Route::get('/search', [VentaController::class, 'search'])->name('search');
+        Route::get('/folio', [VentaController::class, 'generarFolio'])->name('folio');
+        Route::post('/venta-directa', [VentaController::class, 'store'])->name('venta-directa');
+        Route::get('/{id}', [VentaController::class, 'show'])->name('show');
     });
 });
 

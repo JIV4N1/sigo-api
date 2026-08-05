@@ -121,7 +121,7 @@ class InventarioController extends Controller
                 'stock_anterior' => $movimiento->stock_anterior,
                 'stock_nuevo' => $movimiento->stock_nuevo,
                 'motivo' => $movimiento->motivo,
-                'usuario' => $movimiento->usuario ? $movimiento->usuario->name : 'Desconocido',
+                'usuario' => $movimiento->usuario ? $movimiento->usuario->nombre : 'Desconocido',
                 'fecha' => $movimiento->created_at,
             ];
         });
@@ -207,7 +207,7 @@ class InventarioController extends Controller
                         'stock_anterior' => $movimiento->stock_anterior,
                         'stock_nuevo' => $movimiento->stock_nuevo,
                         'motivo' => $movimiento->motivo,
-                        'usuario' => $movimiento->usuario->name,
+                        'usuario' => $movimiento->usuario->nombre,
                         'fecha' => $movimiento->created_at,
                     ]
                 ],

@@ -136,6 +136,41 @@ class MaterialController extends Controller
     }
 
     /**
+     * GET /api/materiales/{id}
+     *
+     * Retorna el detalle de un material con su proveedor.
+     * Verifica que el material pertenezca a la empresa del usuario autenticado.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $empresaId = $this->getEmpresaId($request);
+
+        $material = Material::with('proveedor:id,nombre')->find($id);
+
+        if (! $material) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Material no encontrado.',
+            ], 404);
+        }
+
+        if ($material->empresa_id !== $empresaId) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tiene permisos para consultar este material.',
+            ], 403);
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'data'    => [
+                'material' => $this->formatearMateriales(collect([$material]))[0],
+            ],
+            'message' => 'Material obtenido correctamente',
+        ]);
+    }
+
+    /**
      * POST /api/materiales
      *
      * Crea un nuevo material en el catálogo de la empresa del usuario.

@@ -69,10 +69,13 @@ class HorarioController extends Controller
         }
 
         try {
+            // Asegurar conversión a integer (dia_semana llega validado como numeric)
+            $diaSemana = (int) $request->input('dia_semana');
+
             $horario = ConfiguracionHorario::updateOrCreate(
                 [
                     'empresa_id' => $this->getEmpresaId($request),
-                    'dia_semana' => $request->dia_semana,
+                    'dia_semana' => $diaSemana,
                 ],
                 [
                     'hora_inicio' => $request->hora_inicio,
@@ -120,7 +123,14 @@ class HorarioController extends Controller
                 ], 404);
             }
 
-            $horario->update($request->only(['dia_semana', 'hora_inicio', 'hora_fin', 'es_laboral']));
+            $datos = $request->only(['dia_semana', 'hora_inicio', 'hora_fin', 'es_laboral']);
+
+            // Asegurar conversión a integer (dia_semana llega validado como numeric)
+            if (array_key_exists('dia_semana', $datos)) {
+                $datos['dia_semana'] = (int) $datos['dia_semana'];
+            }
+
+            $horario->update($datos);
 
             return response()->json([
                 'status'  => 'success',

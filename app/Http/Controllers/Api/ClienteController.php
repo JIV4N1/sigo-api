@@ -187,6 +187,39 @@ class ClienteController extends Controller
     }
 
     /**
+     * GET /api/clientes/{id}
+     *
+     * Retorna el detalle de un cliente.
+     * Verifica que el cliente pertenezca a la empresa del usuario autenticado.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $cliente = Cliente::find($id);
+
+        if (! $cliente) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Cliente no encontrado.',
+            ], 404);
+        }
+
+        if ($cliente->empresa_id !== $this->getEmpresaId($request)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tiene permisos para consultar este cliente.',
+            ], 403);
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'data'    => [
+                'cliente' => $this->formatearClientes(collect([$cliente]))[0],
+            ],
+            'message' => 'Cliente obtenido correctamente',
+        ]);
+    }
+
+    /**
      * POST /api/clientes
      *
      * Crea un nuevo cliente en el catálogo de la empresa del usuario.

@@ -123,6 +123,41 @@ class ProveedorController extends Controller
     }
 
     /**
+     * GET /api/proveedores/{id}
+     *
+     * Retorna el detalle de un proveedor.
+     * Verifica que el proveedor pertenezca a la empresa del usuario autenticado.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $empresaId = $this->getEmpresaId($request);
+
+        $proveedor = Proveedor::find($id);
+
+        if (! $proveedor) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Proveedor no encontrado.',
+            ], 404);
+        }
+
+        if ($proveedor->empresa_id !== $empresaId) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tiene permisos para consultar este proveedor.',
+            ], 403);
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'data'    => [
+                'proveedor' => $this->formatearProveedores(collect([$proveedor]))[0],
+            ],
+            'message' => 'Proveedor obtenido correctamente',
+        ]);
+    }
+
+    /**
      * POST /api/proveedores
      *
      * Crea un nuevo proveedor en el catálogo de la empresa.
