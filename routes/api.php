@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\ControlHorarioController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\VentaController;
 use App\Http\Controllers\Api\ReporteVentasController;
+use App\Http\Controllers\Api\PedidoController;
+use App\Http\Controllers\Api\DashboardEjecutivoController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -302,6 +304,30 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/folio', [VentaController::class, 'generarFolio'])->name('folio');
         Route::post('/venta-directa', [VentaController::class, 'store'])->name('venta-directa');
         Route::get('/{id}', [VentaController::class, 'show'])->name('show');
+    });
+
+    // =========================================================================
+    // MÓDULO 12: Pedidos de Venta
+    // =========================================================================
+    Route::prefix('pedidos')->name('pedidos.')->group(function () {
+        Route::get('/', [PedidoController::class, 'index'])->name('index');
+        Route::get('/search', [PedidoController::class, 'search'])->name('search');
+        Route::post('/', [PedidoController::class, 'store'])->name('store');
+        Route::get('/{id}', [PedidoController::class, 'show'])->name('show');
+        Route::put('/{id}', [PedidoController::class, 'update'])->name('update');
+        Route::patch('/{id}/estado', [PedidoController::class, 'cambiarEstado'])->name('estado');
+        Route::delete('/{id}', [PedidoController::class, 'destroy'])->name('destroy');
+    });
+
+    // =========================================================================
+    // MÓDULO 13: Dashboard Ejecutivo
+    // =========================================================================
+    Route::prefix('dashboard-ejecutivo')->name('dashboard-ejecutivo.')->group(function () {
+        Route::get('/', [DashboardEjecutivoController::class, 'index'])->name('index');
+        Route::get('/kpis', [DashboardEjecutivoController::class, 'kpis'])->name('kpis');
+        Route::get('/tendencias', [DashboardEjecutivoController::class, 'tendencias'])->name('tendencias');
+        Route::get('/distribuciones', [DashboardEjecutivoController::class, 'distribuciones'])->name('distribuciones');
+        Route::get('/actividad-reciente', [DashboardEjecutivoController::class, 'actividadReciente'])->name('actividad-reciente');
     });
 });
 

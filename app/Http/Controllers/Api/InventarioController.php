@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inventario\StoreMovimientoRequest;
 use App\Http\Traits\AdminBypassTrait;
 use App\Models\Material;
 use App\Models\MovimientoInventario;
@@ -138,14 +139,9 @@ class InventarioController extends Controller
     /**
      * POST /api/inventario/movimiento
      */
-    public function registrarMovimiento(Request $request)
+    public function registrarMovimiento(StoreMovimientoRequest $request)
     {
-        $validated = $request->validate([
-            'material_id' => 'required|exists:materiales,id',
-            'tipo_movimiento' => 'required|in:Entrada,Salida,Ajuste',
-            'cantidad' => 'required|numeric|min:0',
-            'motivo' => 'nullable|string'
-        ]);
+        $validated = $request->validated();
 
         $user = $request->user();
         $material = Material::findOrFail($validated['material_id']);
@@ -161,7 +157,7 @@ class InventarioController extends Controller
         $tipoMovimiento = $validated['tipo_movimiento'];
         $stockAnterior = $material->stock_actual;
 
-        if ($tipoMovimiento === 'Salida' && $stockAnterior < $cantidad) {
+        if ($tipoMovimiento === 'salida' && $stockAnterior < $cantidad) {
             return response()->json([
                 'status' => 'error',
                 'message' => "Stock insuficiente. Stock actual: {$stockAnterior}, intenta retirar: {$cantidad}"
@@ -169,9 +165,9 @@ class InventarioController extends Controller
         }
 
         $stockNuevo = match ($tipoMovimiento) {
-            'Entrada' => $stockAnterior + $cantidad,
-            'Salida' => $stockAnterior - $cantidad,
-            'Ajuste' => $cantidad,
+            'entrada' => $stockAnterior + $cantidad,
+            'salida' => $stockAnterior - $cantidad,
+            'ajuste' => $cantidad,
         };
 
         try {

@@ -24,7 +24,7 @@ class StoreVentaRequest extends FormRequest
     {
         return [
             'cliente_id'                  => 'required|integer|exists:clientes,id',
-            'fecha'                       => 'required|date',
+            'fecha'                       => 'sometimes|nullable|date',
             'metodo_pago'                 => 'required|string|in:Efectivo,Transferencia,Tarjeta',
             'observaciones'               => 'nullable|string',
             'detalles'                    => 'required|array|min:1',
@@ -42,7 +42,6 @@ class StoreVentaRequest extends FormRequest
         return [
             'cliente_id.required'                 => 'El cliente es obligatorio.',
             'cliente_id.exists'                   => 'El cliente seleccionado no existe.',
-            'fecha.required'                       => 'La fecha es obligatoria.',
             'fecha.date'                            => 'La fecha no tiene un formato válido.',
             'metodo_pago.required'                  => 'El método de pago es obligatorio.',
             'metodo_pago.in'                        => 'El método de pago debe ser uno de: Efectivo, Transferencia, Tarjeta.',

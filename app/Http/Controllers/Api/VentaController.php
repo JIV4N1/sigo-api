@@ -262,7 +262,7 @@ class VentaController extends Controller
                     'cliente_id'    => $request->cliente_id,
                     'usuario_id'    => $user->id,
                     'cotizacion_id' => null,
-                    'fecha'         => $request->fecha,
+                    'fecha'         => $request->filled('fecha') ? $request->fecha : now()->toDateString(),
                     'subtotal'      => round($subtotal, 2),
                     'iva'           => $iva,
                     'total'         => $total,
@@ -290,7 +290,7 @@ class VentaController extends Controller
 
                     MovimientoInventario::create([
                         'material_id'     => $material->id,
-                        'tipo_movimiento' => 'Salida',
+                        'tipo_movimiento' => 'salida',
                         'cantidad'        => $detalle['cantidad'],
                         'stock_anterior'  => $stockAnterior,
                         'stock_nuevo'     => $stockNuevo,

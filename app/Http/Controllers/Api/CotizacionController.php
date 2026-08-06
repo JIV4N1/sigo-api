@@ -342,7 +342,7 @@ class CotizacionController extends Controller
                     // Crear movimiento de inventario
                     MovimientoInventario::create([
                         'material_id' => $material->id,
-                        'tipo_movimiento' => 'Salida',
+                        'tipo_movimiento' => 'salida',
                         'cantidad' => $partida->cantidad,
                         'stock_anterior' => $stockAnterior,
                         'stock_nuevo' => $stockNuevo,
