@@ -665,8 +665,8 @@ class ReporteController extends Controller
     /**
      * PUT /api/reportes/{id}/validar
      *
-     * Permite a un Gerente aprobar o rechazar un reporte diario.
-     * Solo accesible para usuarios con rol 'gerente'.
+     * Permite a un Gerente o Administrador aprobar o rechazar un reporte diario.
+     * Solo accesible para usuarios con rol 'gerente' o 'administrador'.
      *
      * Body: { accion: 'aprobar'|'rechazar', notas?: string }
      *
@@ -679,12 +679,11 @@ class ReporteController extends Controller
         try {
             $usuario = $request->user();
 
-            // Verificar que el usuario es gerente
-            $rolNombre = strtolower($usuario->rol->nombre ?? '');
-            if ($rolNombre !== 'gerente') {
+            // Verificar que el usuario es gerente o administrador
+            if (! $this->isAdminOrGerente($request)) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'Solo los gerentes pueden validar reportes.',
+                    'message' => 'Solo gerentes y administradores pueden validar reportes.',
                 ], 403);
             }
 

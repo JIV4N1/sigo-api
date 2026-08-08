@@ -350,13 +350,14 @@ class IncidenciaController extends Controller
             }
 
             $user = $request->user();
+            $esAdminOGerente = $user->tieneRol(['gerente', 'administrador']);
 
             if (! $this->tieneAccesoAProyecto($request, $incidencia->proyecto_id)) {
                 return response()->json(['status' => 'error', 'message' => 'No tienes acceso a esta incidencia.'], 403);
             }
 
             // Solo el ingeniero asignado (o un administrador/gerente) puede cambiar el estado
-            if ($incidencia->asignado_a !== $user->id && ! $user->tieneRol(['gerente', 'administrador'])) {
+            if ($incidencia->asignado_a !== $user->id && ! $esAdminOGerente) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Solo el ingeniero asignado puede cambiar el estado de esta incidencia.'
@@ -383,6 +384,14 @@ class IncidenciaController extends Controller
                 'comentario.required' => 'El comentario es obligatorio al resolver o cerrar una incidencia.',
             ]);
 
+            // Cerrar una incidencia es exclusivo de administrador/gerente
+            if ($request->estado === Incidencia::ESTADO_CERRADA && ! $esAdminOGerente) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Solo un administrador o gerente puede cerrar una incidencia.',
+                ], 403);
+            }
+
             // Verificar que el estado sea diferente al actual o se esté asignando un nuevo responsable
             $esNuevaAsignacion = $request->has('asignado_a') && $incidencia->asignado_a !== $request->asignado_a;
             if ($incidencia->estado === $request->estado && !$esNuevaAsignacion) {
@@ -392,7 +401,7 @@ class IncidenciaController extends Controller
                 ], 422);
             }
 
-            return DB::transaction(function () use ($request, $incidencia, $estadosFinales, $esNuevaAsignacion): JsonResponse {
+            return DB::transaction(function () use ($request, $incidencia, $estadosFinales, $esNuevaAsignacion, $esAdminOGerente): JsonResponse {
                 $estadoAnterior = $incidencia->estado;
 
                 // Actualizar el estado y la fecha de resolución si aplica
@@ -403,7 +412,7 @@ class IncidenciaController extends Controller
 
                 // Asignar responsable si viene en la petición y es admin/gerente
                 $asignadoNuevo = false;
-                if ($request->has('asignado_a') && $request->user()->tieneRol(['gerente', 'administrador'])) {
+                if ($request->has('asignado_a') && $esAdminOGerente) {
                     $incidencia->asignado_a = $request->asignado_a;
                     $asignadoNuevo = true;
                 }

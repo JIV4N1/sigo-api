@@ -565,6 +565,65 @@ class ProyectoController extends Controller
     }
 
     // =========================================================================
+    // USUARIOS — Listar usuarios asignados activamente al proyecto
+    // =========================================================================
+    public function usuarios(Request $request, int $id): JsonResponse
+    {
+        try {
+            $proyecto = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $this->getEmpresaId($request)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            // Verificar acceso al proyecto (admin/gerente siempre tienen acceso)
+            if (! $this->tieneAccesoAProyecto($request, $id)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'No tienes acceso a este proyecto.',
+                ], 403);
+            }
+
+            $query = $proyecto->usuariosActivos()->with('rol');
+
+            // Filtrar por rol global (?rol=ingeniero o ?rol=<id>)
+            if ($request->filled('rol')) {
+                $rolParam = $request->query('rol');
+                $query->whereHas('rol', function ($q) use ($rolParam) {
+                    if (is_numeric($rolParam)) {
+                        $q->where('id', $rolParam);
+                    } else {
+                        $q->where(DB::raw('LOWER(nombre)'), strtolower($rolParam));
+                    }
+                });
+            }
+
+            $usuarios = $query->orderBy('usuarios.nombre', 'asc')->get()->map(fn ($u) => [
+                'id'     => $u->id,
+                'nombre' => $u->nombre,
+                'email'  => $u->email,
+                'rol'    => $u->rol?->nombre,
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'data'    => $usuarios,
+                'message' => 'Usuarios obtenidos correctamente.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al obtener los usuarios del proyecto.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
     // USUARIOS DISPONIBLES — Listar usuarios de la empresa no asignados
     // =========================================================================
     public function usuariosDisponibles(Request $request, int $id): JsonResponse
