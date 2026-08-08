@@ -53,7 +53,7 @@ class ReporteDiario extends Model
     protected function casts(): array
     {
         return [
-            'fecha_reporte'     => 'date',
+            'fecha_reporte'     => 'date:Y-m-d',
             'avance'            => 'float',
             'personal_presente' => 'integer',
             'validado'          => 'boolean',

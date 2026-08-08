@@ -28,7 +28,7 @@ class Asistencia extends Model
     protected function casts(): array
     {
         return [
-            'fecha' => 'date',
+            'fecha' => 'date:Y-m-d',
             'entrada' => 'datetime',
             'comida_inicio' => 'datetime',
             'comida_fin' => 'datetime',

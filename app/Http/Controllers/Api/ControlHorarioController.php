@@ -123,7 +123,7 @@ class ControlHorarioController extends Controller
                         'comida_inicio'    => $registro?->comida_inicio?->format('H:i'),
                         'comida_fin'       => $registro?->comida_fin?->format('H:i'),
                         'salida'           => $registro?->salida?->format('H:i'),
-                        'horas_trabajadas' => $registro ? $registro->horasTrabajadas() : 0.0,
+                        'horas'            => $registro ? $registro->horasTrabajadas() : 0.0,
                         'estado'           => $estado,
                     ]);
                 }
@@ -145,7 +145,13 @@ class ControlHorarioController extends Controller
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Control horario obtenido correctamente.',
-                'data'    => $paginado,
+                'data'    => $paginado->items(),
+                'meta'    => [
+                    'current_page' => $paginado->currentPage(),
+                    'per_page'     => $paginado->perPage(),
+                    'total'        => $paginado->total(),
+                    'last_page'    => $paginado->lastPage(),
+                ],
             ], 200);
 
         } catch (\Exception $e) {

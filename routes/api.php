@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\VentaController;
 use App\Http\Controllers\Api\ReporteVentasController;
 use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\DashboardEjecutivoController;
+use App\Http\Controllers\Api\GastoObraController;
+use App\Http\Controllers\Api\CategoriaGastoController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -98,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // MÓDULO 3: Reportes Diarios
     // =========================================================================
     Route::get('/proyectos/{id}/reportes', [ReporteController::class, 'index'])->name('reportes.index');
+    Route::get('/reportes', [ReporteController::class, 'listar'])->name('reportes.listar');
     Route::post('/reportes', [ReporteController::class, 'store'])->name('reportes.store');
     Route::get('/reportes/{id}', [ReporteController::class, 'show'])->name('reportes.show');
 
@@ -107,6 +110,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::post('/reportes/{id}/fotos', [ReporteController::class, 'subirFotos'])->name('reportes.fotos');
     Route::put('/reportes/{id}/validar', [ReporteController::class, 'validar'])->name('reportes.validar');
+
+    // Alias esperado por la app móvil (mismo método validar(), mismo body
+    // {accion:'aprobar'|'rechazar', notas?} — solo cambia la URL).
+    Route::put('/reportes/{id}/estado', [ReporteController::class, 'validar'])->name('reportes.estado');
 
     // =========================================================================
     // MÓDULO 4: Incidencias
@@ -328,6 +335,27 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/tendencias', [DashboardEjecutivoController::class, 'tendencias'])->name('tendencias');
         Route::get('/distribuciones', [DashboardEjecutivoController::class, 'distribuciones'])->name('distribuciones');
         Route::get('/actividad-reciente', [DashboardEjecutivoController::class, 'actividadReciente'])->name('actividad-reciente');
+    });
+
+    // =========================================================================
+    // MÓDULO 14: Gastos de Obra
+    // =========================================================================
+    Route::prefix('gastos-obra')->name('gastos-obra.')->group(function () {
+        // Segmentos literales declarados ANTES de /{id} para que Laravel no
+        // los capture como si fueran un {id} (mismo criterio que Ventas/Reportes).
+        Route::get('/search', [GastoObraController::class, 'search'])->name('search');
+        Route::get('/resumen', [GastoObraController::class, 'resumen'])->name('resumen');
+
+        Route::get('/categorias', [CategoriaGastoController::class, 'index'])->name('categorias.index');
+        Route::post('/categorias', [CategoriaGastoController::class, 'store'])->name('categorias.store');
+        Route::put('/categorias/{id}', [CategoriaGastoController::class, 'update'])->name('categorias.update');
+        Route::delete('/categorias/{id}', [CategoriaGastoController::class, 'destroy'])->name('categorias.destroy');
+
+        Route::get('/', [GastoObraController::class, 'index'])->name('index');
+        Route::post('/', [GastoObraController::class, 'store'])->name('store');
+        Route::get('/{id}', [GastoObraController::class, 'show'])->name('show');
+        Route::put('/{id}', [GastoObraController::class, 'update'])->name('update');
+        Route::delete('/{id}', [GastoObraController::class, 'destroy'])->name('destroy');
     });
 });
 

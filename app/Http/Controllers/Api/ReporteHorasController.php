@@ -181,13 +181,11 @@ class ReporteHorasController extends Controller
                 'nombre' => $usuario->nombre,
                 'email'  => $usuario->email,
             ],
-            'resumen' => [
-                'horas_trabajadas' => round($totalTrabajadas, 2),
-                'horas_extra'      => round($totalExtra, 2),
-                'dias_trabajados'  => $diasTrabajados,
-                'dias_falta'       => $diasFalta,
-            ],
-            'dias' => $dias,
+            'total_horas'     => round($totalTrabajadas, 2),
+            'horas_extra'     => round($totalExtra, 2),
+            'faltas'          => $diasFalta,
+            'dias_trabajados' => $diasTrabajados,
+            'dias'            => $dias,
         ];
     }
 }

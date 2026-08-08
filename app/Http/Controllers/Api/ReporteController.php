@@ -147,6 +147,138 @@ class ReporteController extends Controller
     }
 
     // =========================================================================
+    // LISTAR — Listado paginado de TODOS los reportes accesibles (sin proyecto)
+    // =========================================================================
+
+    /**
+     * Lista paginada de todos los reportes diarios accesibles por el usuario
+     * autenticado, sin necesidad de especificar un proyecto.
+     *
+     * Administrador/gerente ven los reportes de todos los proyectos de su
+     * empresa; el resto de los roles solo ven reportes de proyectos donde
+     * están asignados (mismo criterio que tieneAccesoAProyecto()).
+     *
+     * Filtros opcionales (query params):
+     * - ?estado=pendiente|aprobado|rechazado (ver estadoDeReporte())
+     * - ?proyecto_id=
+     * - ?desde=, ?hasta= (sobre fecha_reporte)
+     * - ?categoria=
+     *
+     * @param  Request  $request  Petición autenticada.
+     * @return JsonResponse
+     */
+    public function listar(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $empresaId = $this->getEmpresaId($request);
+
+            $query = ReporteDiario::whereHas('proyecto', function ($q) use ($empresaId) {
+                $q->where('empresa_id', $empresaId);
+            });
+
+            // Supervisor/ingeniero/etc. solo ven reportes de sus proyectos asignados
+            if (! $this->isAdminOrGerente($request)) {
+                $proyectosAsignados = $user->proyectos()->pluck('proyectos.id');
+                $query->whereIn('proyecto_id', $proyectosAsignados);
+            }
+
+            $query->with([
+                'usuario:id,nombre',
+                'fotos:id,reporte_id,ruta_imagen,es_principal',
+            ]);
+
+            if ($request->filled('proyecto_id')) {
+                $query->where('proyecto_id', $request->proyecto_id);
+            }
+
+            if ($request->filled('desde')) {
+                $query->whereDate('fecha_reporte', '>=', $request->desde);
+            }
+
+            if ($request->filled('hasta')) {
+                $query->whereDate('fecha_reporte', '<=', $request->hasta);
+            }
+
+            if ($request->filled('categoria')) {
+                $query->where('categoria', $request->categoria);
+            }
+
+            if ($request->filled('estado')) {
+                match ($request->query('estado')) {
+                    'pendiente' => $query->whereNull('validado_por'),
+                    'aprobado'  => $query->where('validado', true),
+                    'rechazado' => $query->where('validado', false)->whereNotNull('validado_por'),
+                    default     => null,
+                };
+            }
+
+            $query->orderByDesc('fecha_reporte')->orderByDesc('created_at');
+
+            $paginado = $query->paginate(15);
+
+            $reportes = $paginado->getCollection()->map(function (ReporteDiario $reporte): array {
+                $fotos = $reporte->fotos->map(fn ($foto) => [
+                    'id'           => $foto->id,
+                    'ruta_imagen'  => Storage::disk('public')->url($foto->ruta_imagen),
+                    'es_principal' => (bool) $foto->es_principal,
+                ]);
+
+                return [
+                    'id'            => $reporte->id,
+                    'proyecto_id'   => $reporte->proyecto_id,
+                    'fecha_reporte' => $reporte->fecha_reporte,
+                    'turno'         => $reporte->turno,
+                    'categoria'     => $reporte->categoria,
+                    'avance'        => $reporte->avance,
+                    'descripcion'   => $reporte->descripcion,
+                    'validado'      => $reporte->validado,
+                    'estado'        => $this->estadoDeReporte($reporte),
+                    'sincronizado'  => $reporte->sincronizado,
+                    'created_at'    => $reporte->created_at,
+
+                    'usuario' => $reporte->usuario
+                        ? ['id' => $reporte->usuario->id, 'nombre' => $reporte->usuario->nombre]
+                        : null,
+
+                    'fotos' => $fotos,
+                ];
+            });
+
+            $paginado->setCollection($reportes);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Reportes obtenidos correctamente.',
+                'data'    => $paginado,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al obtener los reportes.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    /**
+     * Deriva el estado de 3 valores (pendiente/aprobado/rechazado) a partir
+     * de validado + validado_por, sin necesidad de una columna nueva:
+     * - pendiente: el reporte nunca fue revisado (validado_por es null).
+     * - aprobado: validado = true.
+     * - rechazado: validado = false, pero ya fue revisado (validado_por no es null).
+     */
+    private function estadoDeReporte(ReporteDiario $reporte): string
+    {
+        if (is_null($reporte->validado_por)) {
+            return 'pendiente';
+        }
+
+        return $reporte->validado ? 'aprobado' : 'rechazado';
+    }
+
+    // =========================================================================
     // STORE — Crear nuevo reporte diario con fotos opcionales
     // =========================================================================
 
@@ -192,6 +324,8 @@ class ReporteController extends Controller
                     'avance'        => $request->avance,
                     'descripcion'   => $request->descripcion,
                     'validado'      => false,
+                    'validado_por'  => null,
+                    'validado_el'   => null,
                     'sincronizado'  => true,
                 ]);
 

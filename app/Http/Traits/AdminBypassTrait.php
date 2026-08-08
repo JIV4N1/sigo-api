@@ -2,7 +2,6 @@
 
 namespace App\Http\Traits;
 
-use App\Models\ProyectoUsuario;
 use Illuminate\Http\Request;
 
 trait AdminBypassTrait
@@ -20,7 +19,9 @@ trait AdminBypassTrait
     /**
      * Verifica si el usuario tiene acceso a un proyecto específico.
      * Admin y gerente siempre tienen acceso (bypass automático).
-     * Otros roles solo si están asignados en proyecto_usuario.
+     * Otros roles solo si están asignados en la tabla pivote proyecto_usuario
+     * (vía la relación Usuario::proyectos(), sin filtrar por pivote activo,
+     * igual que el resto de los chequeos de acceso a proyecto en la API).
      */
     protected function tieneAccesoAProyecto(Request $request, int $proyectoId): bool
     {
@@ -28,9 +29,7 @@ trait AdminBypassTrait
             return true;
         }
 
-        return ProyectoUsuario::where('proyecto_id', $proyectoId)
-            ->where('usuario_id', $request->user()->id)
-            ->exists();
+        return $request->user()->proyectos()->where('proyectos.id', $proyectoId)->exists();
     }
 
     /**

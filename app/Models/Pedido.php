@@ -30,8 +30,8 @@ class Pedido extends Model
     protected function casts(): array
     {
         return [
-            'fecha_pedido'  => 'date',
-            'fecha_entrega' => 'date',
+            'fecha_pedido'  => 'date:Y-m-d',
+            'fecha_entrega' => 'date:Y-m-d',
             'subtotal'      => 'float',
             'iva'           => 'float',
             'total'         => 'float',
