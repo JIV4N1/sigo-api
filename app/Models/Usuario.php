@@ -120,6 +120,16 @@ class Usuario extends Authenticatable
     }
 
     /**
+     * Verifica si el usuario tiene el rol "superadmin", con control total
+     * sobre todas las empresas del sistema (fuera del scoping multi-tenant
+     * normal basado en empresa_id / empresa_activa_id).
+     */
+    public function esSuperadmin(): bool
+    {
+        return $this->tieneRol('superadmin');
+    }
+
+    /**
      * Relación: un usuario ha elaborado muchos reportes diarios.
      */
     public function reportes(): HasMany

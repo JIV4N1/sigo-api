@@ -392,6 +392,23 @@ class IncidenciaController extends Controller
                 ], 403);
             }
 
+            // El responsable asignado debe pertenecer activamente al equipo del proyecto,
+            // o quedará sin acceso a la incidencia vía tieneAccesoAProyecto().
+            if ($request->filled('asignado_a')) {
+                $perteneceAlEquipo = $incidencia->proyecto()
+                    ->first()
+                    ->usuariosActivos()
+                    ->where('usuarios.id', $request->asignado_a)
+                    ->exists();
+
+                if (! $perteneceAlEquipo) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'El usuario a asignar debe formar parte del equipo del proyecto. Agrégalo primero desde la gestión de personal del proyecto.',
+                    ], 422);
+                }
+            }
+
             // Verificar que el estado sea diferente al actual o se esté asignando un nuevo responsable
             $esNuevaAsignacion = $request->has('asignado_a') && $incidencia->asignado_a !== $request->asignado_a;
             if ($incidencia->estado === $request->estado && !$esNuevaAsignacion) {

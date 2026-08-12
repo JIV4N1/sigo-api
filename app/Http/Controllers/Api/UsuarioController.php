@@ -47,6 +47,13 @@ class UsuarioController extends Controller
         try {
             $query = Usuario::where('empresa_id', $this->getEmpresaId($request))->with('rol');
 
+            // El rol superadmin es invisible para cualquiera que no lo sea.
+            if (! $user->esSuperadmin()) {
+                $query->whereDoesntHave('rol', function ($q) {
+                    $q->where('nombre', 'superadmin');
+                });
+            }
+
             $activoParam = $request->query('activo');
             if ($activoParam === null) {
                 $query->where('activo', true);

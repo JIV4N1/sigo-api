@@ -20,6 +20,9 @@ use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\DashboardEjecutivoController;
 use App\Http\Controllers\Api\GastoObraController;
 use App\Http\Controllers\Api\CategoriaGastoController;
+use App\Http\Controllers\Api\Superadmin\EmpresaController as SuperadminEmpresaController;
+use App\Http\Controllers\Api\Superadmin\EstadisticaController as SuperadminEstadisticaController;
+use App\Http\Controllers\Api\Superadmin\UsuarioController as SuperadminUsuarioController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
@@ -357,6 +360,28 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{id}', [GastoObraController::class, 'show'])->name('show');
         Route::put('/{id}', [GastoObraController::class, 'update'])->name('update');
         Route::delete('/{id}', [GastoObraController::class, 'destroy'])->name('destroy');
+    });
+
+    // =========================================================================
+    // MÓDULO 15: Superadmin — control total sobre todas las empresas del sistema
+    // =========================================================================
+    Route::prefix('superadmin')->name('superadmin.')->middleware('superadmin')->group(function () {
+        Route::get('/estadisticas', [SuperadminEstadisticaController::class, 'index'])->name('estadisticas');
+
+        Route::prefix('empresas')->name('empresas.')->group(function () {
+            Route::get('/', [SuperadminEmpresaController::class, 'index'])->name('index');
+            Route::get('/{id}', [SuperadminEmpresaController::class, 'show'])->name('show');
+            Route::put('/{id}', [SuperadminEmpresaController::class, 'update'])->name('update');
+            Route::patch('/{id}/estado', [SuperadminEmpresaController::class, 'cambiarEstado'])->name('estado');
+            Route::get('/{id}/usuarios', [SuperadminEmpresaController::class, 'usuarios'])->name('usuarios');
+            Route::post('/{id}/admin', [SuperadminEmpresaController::class, 'asignarAdmin'])->name('admin');
+        });
+
+        Route::prefix('usuarios')->name('usuarios.')->group(function () {
+            Route::get('/', [SuperadminUsuarioController::class, 'index'])->name('index');
+            Route::patch('/{id}/rol', [SuperadminUsuarioController::class, 'cambiarRol'])->name('rol');
+            Route::patch('/{id}/estado', [SuperadminUsuarioController::class, 'cambiarEstado'])->name('estado');
+        });
     });
 });
 
