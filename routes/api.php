@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClienteController;
+use App\Http\Controllers\Api\EvidenciaController;
 use App\Http\Controllers\Api\IncidenciaController;
 use App\Http\Controllers\Api\MaterialController;
 use App\Http\Controllers\Api\ProyectoController;
@@ -158,6 +159,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     /** POST /api/incidencias/{id}/comentarios — Agregar comentario */
     Route::post('/incidencias/{id}/comentarios', [IncidenciaController::class, 'agregarComentario'])
          ->name('incidencias.comentarios.store');
+
+    // =========================================================================
+    // MÓDULO: Evidencias — galería unificada de fotos de reportes e incidencias
+    // =========================================================================
+
+    /** GET /api/evidencias — Todas las fotos de los proyectos accesibles */
+    Route::get('/evidencias', [EvidenciaController::class, 'index'])
+         ->name('evidencias.index');
 
     // =========================================================================
     // MÓDULO 6: Asistencia

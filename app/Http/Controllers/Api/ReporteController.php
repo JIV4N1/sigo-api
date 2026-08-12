@@ -103,7 +103,7 @@ class ReporteController extends Controller
                 $fotos = $reporte->fotos->map(function ($foto) {
                     return [
                         'id' => $foto->id,
-                        'ruta_imagen' => Storage::disk('public')->url($foto->ruta_imagen),
+                        'url' => Storage::disk('public')->url($foto->ruta_imagen),
                         'es_principal' => (bool)$foto->es_principal
                     ];
                 });
@@ -223,7 +223,7 @@ class ReporteController extends Controller
             $reportes = $paginado->getCollection()->map(function (ReporteDiario $reporte): array {
                 $fotos = $reporte->fotos->map(fn ($foto) => [
                     'id'           => $foto->id,
-                    'ruta_imagen'  => Storage::disk('public')->url($foto->ruta_imagen),
+                    'url'          => Storage::disk('public')->url($foto->ruta_imagen),
                     'es_principal' => (bool) $foto->es_principal,
                 ]);
 
