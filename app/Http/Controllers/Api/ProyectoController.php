@@ -11,6 +11,7 @@ use App\Models\Usuario;
 use App\Http\Requests\ProyectoStoreRequest;
 use App\Http\Requests\ProyectoUpdateRequest;
 use App\Http\Requests\AsignacionRequest;
+use App\Http\Requests\AsignacionMasivaRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -514,6 +515,73 @@ class ProyectoController extends Controller
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Error al asignar usuario.',
+                'errors'  => ['exception' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+    // =========================================================================
+    // ASIGNAR MASIVO — Asignar varios usuarios a la vez
+    // =========================================================================
+    public function asignarMasivo(AsignacionMasivaRequest $request, int $id): JsonResponse
+    {
+        if (! $request->user()->tieneRol(['gerente', 'administrador'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No tienes permisos para asignar personal.',
+            ], 403);
+        }
+
+        try {
+            $empresaId = $this->getEmpresaId($request);
+            $proyecto  = Proyecto::find($id);
+
+            if (! $proyecto || $proyecto->empresa_id !== $empresaId) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Proyecto no encontrado.',
+                ], 404);
+            }
+
+            $rol = $request->input('rol_en_proyecto') ?? $request->input('rol') ?? 'trabajador';
+
+            $asignados = 0;
+            $detalle   = [];
+
+            DB::transaction(function () use ($request, $proyecto, $empresaId, $rol, &$asignados, &$detalle) {
+                foreach ($request->usuario_ids as $usuarioId) {
+                    $usuario = Usuario::where('empresa_id', $empresaId)->find($usuarioId);
+
+                    if (! $usuario) {
+                        $detalle[] = ['usuario_id' => $usuarioId, 'estado' => 'no_pertenece_a_la_empresa'];
+                        continue;
+                    }
+
+                    if (! $usuario->activo) {
+                        $detalle[] = ['usuario_id' => $usuarioId, 'estado' => 'inactivo'];
+                        continue;
+                    }
+
+                    $proyecto->asignarUsuario($usuario->id, $rol);
+                    $detalle[] = ['usuario_id' => $usuarioId, 'estado' => 'asignado'];
+                    $asignados++;
+                }
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => "{$asignados} usuarios asignados correctamente",
+                'data'    => [
+                    'asignados' => $asignados,
+                    'total'     => count($request->usuario_ids),
+                    'detalle'   => $detalle,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al asignar usuarios.',
                 'errors'  => ['exception' => $e->getMessage()],
             ], 500);
         }

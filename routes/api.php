@@ -94,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{id}/usuarios', [ProyectoController::class, 'usuarios'])->name('usuarios');
         Route::get('/{id}/usuarios-disponibles', [ProyectoController::class, 'usuariosDisponibles'])->name('usuarios-disponibles');
         Route::post('/{id}/usuarios', [ProyectoController::class, 'asignarUsuario'])->name('asignar-usuario');
+        Route::post('/{id}/asignar-masivo', [ProyectoController::class, 'asignarMasivo'])->name('asignar-masivo');
         Route::delete('/{id}/usuarios/{usuarioId}', [ProyectoController::class, 'removerUsuario'])->name('remover-usuario');
     });
 
