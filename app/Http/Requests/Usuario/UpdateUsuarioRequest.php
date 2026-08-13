@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Usuario;
 
+use App\Http\Traits\AdminBypassTrait;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 /**
  * Valida los datos para actualizar un usuario existente.
@@ -15,6 +17,8 @@ use Illuminate\Http\Exceptions\HttpResponseException;
  */
 class UpdateUsuarioRequest extends FormRequest
 {
+    use AdminBypassTrait;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -35,6 +39,13 @@ class UpdateUsuarioRequest extends FormRequest
             'telefono' => 'sometimes|nullable|string|max:20',
             'rol_id'   => 'sometimes|required|integer|exists:roles,id',
             'activo'   => 'sometimes|boolean',
+            'departamento_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists('departamentos', 'id')
+                    ->where(fn ($query) => $query->where('empresa_id', $this->getEmpresaId($this))),
+            ],
         ];
     }
 
@@ -53,6 +64,7 @@ class UpdateUsuarioRequest extends FormRequest
             'telefono.max'      => 'El teléfono no puede superar los 20 caracteres.',
             'rol_id.exists'     => 'El rol seleccionado no existe.',
             'activo.boolean'    => 'El campo activo debe ser verdadero o falso.',
+            'departamento_id.exists' => 'El departamento seleccionado no existe o no pertenece a tu empresa.',
         ];
     }
 

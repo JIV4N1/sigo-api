@@ -45,7 +45,7 @@ class UsuarioController extends Controller
         }
 
         try {
-            $query = Usuario::where('empresa_id', $this->getEmpresaId($request))->with('rol');
+            $query = Usuario::where('empresa_id', $this->getEmpresaId($request))->with(['rol', 'departamento']);
 
             // El rol superadmin es invisible para cualquiera que no lo sea.
             if (! $user->esSuperadmin()) {
@@ -116,16 +116,17 @@ class UsuarioController extends Controller
             $esAdministrador = $rol && $rol->nombre === 'administrador';
 
             $usuario = Usuario::create([
-                'empresa_id' => $esAdministrador ? null : $this->getEmpresaId($request),
-                'nombre'     => $request->nombre,
-                'email'      => $request->email,
-                'password'   => Hash::make($request->password),
-                'telefono'   => $request->telefono,
-                'rol_id'     => $request->rol_id,
-                'activo'     => $request->boolean('activo', true),
+                'empresa_id'       => $esAdministrador ? null : $this->getEmpresaId($request),
+                'nombre'           => $request->nombre,
+                'email'            => $request->email,
+                'password'         => Hash::make($request->password),
+                'telefono'         => $request->telefono,
+                'rol_id'           => $request->rol_id,
+                'departamento_id'  => $esAdministrador ? null : $request->departamento_id,
+                'activo'           => $request->boolean('activo', true),
             ]);
 
-            $usuario->load('rol');
+            $usuario->load(['rol', 'departamento']);
 
             return response()->json([
                 'status'  => 'success',
@@ -158,7 +159,7 @@ class UsuarioController extends Controller
 
         try {
             $usuario = Usuario::where('empresa_id', $this->getEmpresaId($request))
-                ->with('rol')
+                ->with(['rol', 'departamento'])
                 ->find($id);
 
             if (! $usuario) {
@@ -207,14 +208,14 @@ class UsuarioController extends Controller
                 ], 404);
             }
 
-            $datos = $request->only(['nombre', 'email', 'telefono', 'rol_id', 'activo']);
+            $datos = $request->only(['nombre', 'email', 'telefono', 'rol_id', 'activo', 'departamento_id']);
 
             if ($request->filled('password')) {
                 $datos['password'] = Hash::make($request->password);
             }
 
             $usuario->update($datos);
-            $usuario->load('rol');
+            $usuario->load(['rol', 'departamento']);
 
             return response()->json([
                 'status'  => 'success',
@@ -296,6 +297,12 @@ class UsuarioController extends Controller
             'rol'           => $u->rol ? [
                 'id'     => $u->rol->id,
                 'nombre' => $u->rol->nombre,
+            ] : null,
+            'departamento_id' => $u->departamento_id,
+            'departamento'    => $u->departamento ? [
+                'id'          => $u->departamento->id,
+                'nombre'      => $u->departamento->nombre,
+                'descripcion' => $u->departamento->descripcion,
             ] : null,
         ];
     }
