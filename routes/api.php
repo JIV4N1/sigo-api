@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\DashboardEjecutivoController;
 use App\Http\Controllers\Api\GastoObraController;
 use App\Http\Controllers\Api\CategoriaGastoController;
+use App\Http\Controllers\Api\DepartamentoController;
 use App\Http\Controllers\Api\Superadmin\EmpresaController as SuperadminEmpresaController;
 use App\Http\Controllers\Api\Superadmin\EstadisticaController as SuperadminEstadisticaController;
 use App\Http\Controllers\Api\Superadmin\UsuarioController as SuperadminUsuarioController;
@@ -67,6 +68,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/{id}', [UsuarioController::class, 'show'])->name('show');
         Route::put('/{id}', [UsuarioController::class, 'update'])->name('update');
         Route::delete('/{id}', [UsuarioController::class, 'destroy'])->name('destroy');
+    });
+
+    // =========================================================================
+    // MÓDULO: Departamentos
+    // =========================================================================
+    Route::prefix('departamentos')->name('departamentos.')->group(function () {
+        Route::get('/', [DepartamentoController::class, 'index'])->name('index');
+        Route::post('/', [DepartamentoController::class, 'store'])->name('store');
+        Route::put('/{id}', [DepartamentoController::class, 'update'])->name('update');
+        Route::delete('/{id}', [DepartamentoController::class, 'destroy'])->name('destroy');
     });
 
     // =========================================================================

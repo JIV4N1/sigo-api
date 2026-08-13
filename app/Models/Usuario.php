@@ -40,6 +40,7 @@ class Usuario extends Authenticatable
         'activo',
         'ultimo_acceso',
         'empresa_activa_id',
+        'departamento_id',
     ];
 
     /**
@@ -175,6 +176,14 @@ class Usuario extends Authenticatable
     public function empresaActiva(): BelongsTo
     {
         return $this->belongsTo(Empresa::class, 'empresa_activa_id');
+    }
+
+    /**
+     * Relación: departamento al que pertenece el usuario dentro de su empresa.
+     */
+    public function departamento(): BelongsTo
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 
     /**
