@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Reporte\StoreReporteRequest;
 use App\Http\Traits\AdminBypassTrait;
 use App\Models\FotoReporte;
+use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\ReporteDiario;
 use Illuminate\Http\JsonResponse;
@@ -708,6 +709,18 @@ class ReporteController extends Controller
                 'validado_el'       => now(),
                 'notas_validacion'  => $request->notas ?? null,
             ]);
+
+            if ($reporte->usuario_id !== $usuario->id) {
+                Notificacion::crear(
+                    $reporte->usuario_id,
+                    Notificacion::TIPO_REPORTE_VALIDADO,
+                    $aprobado ? 'Reporte aprobado' : 'Reporte rechazado',
+                    'Tu reporte del ' . $reporte->fecha_reporte->format('d/m/Y') . ' ha sido ' . ($aprobado ? 'aprobado' : 'rechazado') . '.',
+                    "/reportes-diarios/{$reporte->id}",
+                    $reporte->id,
+                    'reporte',
+                );
+            }
 
             return response()->json([
                 'status'  => 'success',

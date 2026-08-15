@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\DashboardEjecutivoController;
 use App\Http\Controllers\Api\GastoObraController;
 use App\Http\Controllers\Api\CategoriaGastoController;
 use App\Http\Controllers\Api\DepartamentoController;
+use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\Superadmin\EmpresaController as SuperadminEmpresaController;
 use App\Http\Controllers\Api\Superadmin\EstadisticaController as SuperadminEstadisticaController;
 use App\Http\Controllers\Api\Superadmin\UsuarioController as SuperadminUsuarioController;
@@ -78,6 +79,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/', [DepartamentoController::class, 'store'])->name('store');
         Route::put('/{id}', [DepartamentoController::class, 'update'])->name('update');
         Route::delete('/{id}', [DepartamentoController::class, 'destroy'])->name('destroy');
+    });
+
+    // =========================================================================
+    // MÓDULO: Notificaciones
+    // =========================================================================
+    Route::prefix('notificaciones')->name('notificaciones.')->group(function () {
+        Route::get('/', [NotificacionController::class, 'index'])->name('index');
+        Route::get('/no-leidas', [NotificacionController::class, 'noLeidas'])->name('no-leidas');
+        Route::patch('/{id}/leer', [NotificacionController::class, 'marcarLeida'])->name('leer');
+        Route::patch('/leer-todas', [NotificacionController::class, 'marcarTodasLeidas'])->name('leer-todas');
     });
 
     // =========================================================================

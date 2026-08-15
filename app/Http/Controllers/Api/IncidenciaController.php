@@ -9,6 +9,7 @@ use App\Models\ComentarioIncidencia;
 use App\Models\FotoIncidencia;
 use App\Models\HistorialIncidencia;
 use App\Models\Incidencia;
+use App\Models\Notificacion;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -463,6 +464,34 @@ class IncidenciaController extends Controller
                         'usuario_id'    => $request->user()->id,
                         'comentario'    => $request->comentario,
                     ]);
+                }
+
+                // Notificar al nuevo responsable asignado
+                if ($asignadoNuevo && $incidencia->asignado_a !== $request->user()->id) {
+                    Notificacion::crear(
+                        $incidencia->asignado_a,
+                        Notificacion::TIPO_INCIDENCIA_ASIGNADA,
+                        'Nueva incidencia asignada',
+                        "Se te ha asignado la incidencia #{$incidencia->codigo}: {$incidencia->titulo}",
+                        "/incidencias/{$incidencia->id}",
+                        $incidencia->id,
+                        'incidencia',
+                    );
+                }
+
+                // Notificar al reportante cuando la incidencia se resuelve
+                if ($request->estado === Incidencia::ESTADO_RESUELTA
+                    && $incidencia->reportado_por
+                    && $incidencia->reportado_por !== $request->user()->id) {
+                    Notificacion::crear(
+                        $incidencia->reportado_por,
+                        Notificacion::TIPO_INCIDENCIA_RESUELTA,
+                        'Incidencia resuelta',
+                        "La incidencia #{$incidencia->codigo} ha sido resuelta",
+                        "/incidencias/{$incidencia->id}",
+                        $incidencia->id,
+                        'incidencia',
+                    );
                 }
 
                 return response()->json([

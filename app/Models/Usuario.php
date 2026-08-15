@@ -163,6 +163,14 @@ class Usuario extends Authenticatable
     }
 
     /**
+     * Relación: notificaciones dirigidas a este usuario.
+     */
+    public function notificaciones(): HasMany
+    {
+        return $this->hasMany(Notificacion::class, 'usuario_id');
+    }
+
+    /**
      * Relación: la empresa principal o actual del usuario.
      */
     public function empresa(): BelongsTo
