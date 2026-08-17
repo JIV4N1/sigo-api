@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\GastoObraController;
 use App\Http\Controllers\Api\CategoriaGastoController;
 use App\Http\Controllers\Api\DepartamentoController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\MaquinariaController;
 use App\Http\Controllers\Api\Superadmin\EmpresaController as SuperadminEmpresaController;
 use App\Http\Controllers\Api\Superadmin\EstadisticaController as SuperadminEstadisticaController;
 use App\Http\Controllers\Api\Superadmin\UsuarioController as SuperadminUsuarioController;
@@ -314,6 +315,34 @@ Route::middleware('auth:sanctum')->group(function (): void {
     /** PATCH /api/materiales/{id}/desactivar — Desactivar material (sin eliminar) */
     Route::patch('/materiales/{id}/desactivar', [MaterialController::class, 'desactivar'])
          ->name('materiales.desactivar');
+
+    // =========================================================================
+    // MÓDULO: Maquinaria
+    // =========================================================================
+
+    /** GET /api/maquinaria — Listado de maquinaria activa */
+    Route::get('/maquinaria', [MaquinariaController::class, 'index'])
+         ->name('maquinaria.index');
+
+    /** GET /api/maquinaria/search — Búsqueda por texto (nombre o código) */
+    Route::get('/maquinaria/search', [MaquinariaController::class, 'search'])
+         ->name('maquinaria.search');
+
+    /** GET /api/maquinaria/{id} — Detalle de una maquinaria */
+    Route::get('/maquinaria/{id}', [MaquinariaController::class, 'show'])
+         ->name('maquinaria.show');
+
+    /** POST /api/maquinaria — Crear nueva maquinaria (admin/gerente) */
+    Route::post('/maquinaria', [MaquinariaController::class, 'store'])
+         ->name('maquinaria.store');
+
+    /** PUT /api/maquinaria/{id} — Actualizar maquinaria existente (admin/gerente) */
+    Route::put('/maquinaria/{id}', [MaquinariaController::class, 'update'])
+         ->name('maquinaria.update');
+
+    /** PATCH /api/maquinaria/{id}/desactivar — Desactivar maquinaria (admin/gerente) */
+    Route::patch('/maquinaria/{id}/desactivar', [MaquinariaController::class, 'desactivar'])
+         ->name('maquinaria.desactivar');
 
     // =========================================================================
     // MÓDULO 9: Inventario
