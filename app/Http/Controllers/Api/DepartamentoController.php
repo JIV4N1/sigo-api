@@ -52,6 +52,36 @@ class DepartamentoController extends Controller
     }
 
     /**
+     * GET /api/departamentos-publicos
+     *
+     * Listado público (sin autenticación) de departamentos activos de una
+     * empresa, usado por el formulario de auto-registro para poblar el
+     * select de departamento una vez elegida la empresa.
+     * Solo expone id y nombre.
+     */
+    public function publicos(Request $request): JsonResponse
+    {
+        $request->validate([
+            'empresa_id' => ['required', 'integer', 'exists:empresas,id'],
+        ], [
+            'empresa_id.required' => 'Debes indicar la empresa.',
+            'empresa_id.integer'  => 'La empresa indicada no es válida.',
+            'empresa_id.exists'   => 'La empresa indicada no existe.',
+        ]);
+
+        $departamentos = Departamento::where('empresa_id', $request->empresa_id)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return response()->json([
+            'status'  => 'success',
+            'data'    => $departamentos,
+            'message' => 'Departamentos obtenidos correctamente',
+        ], 200);
+    }
+
+    /**
      * POST /api/departamentos
      */
     public function store(StoreDepartamentoRequest $request): JsonResponse
