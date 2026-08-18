@@ -91,6 +91,26 @@ class EmpresaController extends Controller
     }
 
     /**
+     * GET /api/empresas-publicas
+     *
+     * Listado público (sin autenticación) de empresas activas, usado por el
+     * formulario de auto-registro para poblar el select de empresa.
+     * Solo expone id y nombre.
+     */
+    public function publicas(Request $request): JsonResponse
+    {
+        $empresas = Empresa::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return response()->json([
+            'status'  => 'success',
+            'data'    => $empresas,
+            'message' => 'Empresas obtenidas correctamente',
+        ], 200);
+    }
+
+    /**
      * GET /api/empresa/configuracion
      *
      * Retorna la configuración de la empresa activa del usuario autenticado

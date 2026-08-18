@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\Route;
 // =============================================================================
 
 Route::post('/registro', [RegistroController::class, 'registrar'])->name('registro');
+Route::get('/empresas-publicas', [EmpresaController::class, 'publicas'])->name('empresas-publicas');
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
