@@ -35,6 +35,7 @@ class StoreDepartamentoRequest extends FormRequest
                     ->where(fn ($query) => $query->where('empresa_id', $this->getEmpresaId($this))),
             ],
             'descripcion' => 'nullable|string',
+            'rol_id'      => 'nullable|integer|exists:roles,id',
         ];
     }
 
@@ -47,6 +48,7 @@ class StoreDepartamentoRequest extends FormRequest
             'nombre.required' => 'El nombre del departamento es obligatorio.',
             'nombre.max'      => 'El nombre no puede superar los 100 caracteres.',
             'nombre.unique'   => 'Ya existe un departamento con ese nombre en tu empresa.',
+            'rol_id.exists'   => 'El rol seleccionado no existe.',
         ];
     }
 

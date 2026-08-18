@@ -24,14 +24,22 @@ use App\Http\Controllers\Api\CategoriaGastoController;
 use App\Http\Controllers\Api\DepartamentoController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\MaquinariaController;
+use App\Http\Controllers\Api\RegistroController;
 use App\Http\Controllers\Api\Superadmin\EmpresaController as SuperadminEmpresaController;
 use App\Http\Controllers\Api\Superadmin\EstadisticaController as SuperadminEstadisticaController;
+use App\Http\Controllers\Api\Superadmin\SolicitudesController as SuperadminSolicitudesController;
 use App\Http\Controllers\Api\Superadmin\UsuarioController as SuperadminUsuarioController;
 use Illuminate\Support\Facades\Route;
 
 // =============================================================================
 // MÓDULO 1: Autenticación
 // =============================================================================
+
+// =============================================================================
+// MÓDULO: Registro público (auto-registro pendiente de aprobación por superadmin)
+// =============================================================================
+
+Route::post('/registro', [RegistroController::class, 'registrar'])->name('registro');
 
 Route::prefix('auth')->name('auth.')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
@@ -442,6 +450,12 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::get('/', [SuperadminUsuarioController::class, 'index'])->name('index');
             Route::patch('/{id}/rol', [SuperadminUsuarioController::class, 'cambiarRol'])->name('rol');
             Route::patch('/{id}/estado', [SuperadminUsuarioController::class, 'cambiarEstado'])->name('estado');
+        });
+
+        Route::prefix('solicitudes')->name('solicitudes.')->group(function () {
+            Route::get('/', [SuperadminSolicitudesController::class, 'index'])->name('index');
+            Route::patch('/{id}/aprobar', [SuperadminSolicitudesController::class, 'aprobar'])->name('aprobar');
+            Route::patch('/{id}/rechazar', [SuperadminSolicitudesController::class, 'rechazar'])->name('rechazar');
         });
     });
 });

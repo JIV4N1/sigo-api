@@ -25,6 +25,7 @@ class Departamento extends Model
         'nombre',
         'descripcion',
         'activo',
+        'rol_id',
     ];
 
     protected function casts(): array
@@ -42,5 +43,14 @@ class Departamento extends Model
     public function usuarios(): HasMany
     {
         return $this->hasMany(Usuario::class, 'departamento_id');
+    }
+
+    /**
+     * Relación: rol por defecto que se asigna a los usuarios de este departamento
+     * al aprobarse su solicitud de registro.
+     */
+    public function rol(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'rol_id');
     }
 }

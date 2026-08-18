@@ -124,6 +124,8 @@ class UsuarioController extends Controller
                 'rol_id'           => $request->rol_id,
                 'departamento_id'  => $esAdministrador ? null : $request->departamento_id,
                 'activo'           => $request->boolean('activo', true),
+                'aprobado'         => true,
+                'rechazado'        => false,
             ]);
 
             $usuario->load(['rol', 'departamento']);

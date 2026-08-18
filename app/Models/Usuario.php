@@ -41,6 +41,12 @@ class Usuario extends Authenticatable
         'ultimo_acceso',
         'empresa_activa_id',
         'departamento_id',
+        'aprobado',
+        'rechazado',
+        'fecha_solicitud',
+        'motivo_rechazo',
+        'aprobado_por',
+        'fecha_aprobacion',
     ];
 
     /**
@@ -64,6 +70,10 @@ class Usuario extends Authenticatable
             'email_verified_at' => 'datetime',
             'activo'            => 'boolean',
             'ultimo_acceso'     => 'datetime',
+            'aprobado'          => 'boolean',
+            'rechazado'         => 'boolean',
+            'fecha_solicitud'   => 'datetime',
+            'fecha_aprobacion'  => 'datetime',
         ];
     }
 
@@ -201,6 +211,14 @@ class Usuario extends Authenticatable
     {
         return $this->belongsToMany(Empresa::class, 'empresa_usuario', 'usuario_id', 'empresa_id')
                     ->withPivot('rol_en_empresa', 'asignado_el');
+    }
+
+    /**
+     * Relación: superadmin que aprobó la solicitud de registro de este usuario.
+     */
+    public function aprobadoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'aprobado_por');
     }
 }
 

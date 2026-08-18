@@ -39,6 +39,7 @@ class UpdateDepartamentoRequest extends FormRequest
             ],
             'descripcion' => 'sometimes|nullable|string',
             'activo'      => 'sometimes|boolean',
+            'rol_id'      => 'sometimes|nullable|integer|exists:roles,id',
         ];
     }
 
@@ -51,6 +52,7 @@ class UpdateDepartamentoRequest extends FormRequest
             'nombre.required' => 'El nombre del departamento es obligatorio.',
             'nombre.max'      => 'El nombre no puede superar los 100 caracteres.',
             'nombre.unique'   => 'Ya existe otro departamento con ese nombre en tu empresa.',
+            'rol_id.exists'   => 'El rol seleccionado no existe.',
         ];
     }
 

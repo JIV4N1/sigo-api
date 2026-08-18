@@ -52,7 +52,22 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // 3. Verificar que el usuario esté activo
+            // 3. Verificar el estado de aprobación de la solicitud de registro
+            if (! $usuario->aprobado && ! $usuario->rechazado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Tu cuenta está pendiente de aprobación por el administrador.',
+                ], 403);
+            }
+
+            if ($usuario->rechazado) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Tu solicitud fue rechazada. ' . $usuario->motivo_rechazo,
+                ], 403);
+            }
+
+            // 4. Verificar que el usuario esté activo
             if (! $usuario->activo) {
                 return response()->json([
                     'status'  => 'error',

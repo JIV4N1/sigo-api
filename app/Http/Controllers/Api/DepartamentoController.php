@@ -32,6 +32,7 @@ class DepartamentoController extends Controller
         try {
             $departamentos = Departamento::where('empresa_id', $this->getEmpresaId($request))
                 ->where('activo', true)
+                ->with('rol:id,nombre')
                 ->orderBy('nombre')
                 ->get();
 
@@ -65,6 +66,7 @@ class DepartamentoController extends Controller
                 'nombre'      => $request->nombre,
                 'descripcion' => $request->descripcion,
                 'activo'      => true,
+                'rol_id'      => $request->rol_id,
             ]);
 
             return response()->json([
@@ -101,7 +103,7 @@ class DepartamentoController extends Controller
                 ], 404);
             }
 
-            $departamento->update($request->only(['nombre', 'descripcion', 'activo']));
+            $departamento->update($request->only(['nombre', 'descripcion', 'activo', 'rol_id']));
 
             return response()->json([
                 'status'  => 'success',
@@ -192,6 +194,11 @@ class DepartamentoController extends Controller
             'nombre'      => $departamento->nombre,
             'descripcion' => $departamento->descripcion,
             'activo'      => $departamento->activo,
+            'rol_id'      => $departamento->rol_id,
+            'rol'         => $departamento->rol ? [
+                'id'     => $departamento->rol->id,
+                'nombre' => $departamento->rol->nombre,
+            ] : null,
             'created_at'  => $departamento->created_at,
             'updated_at'  => $departamento->updated_at,
         ];
